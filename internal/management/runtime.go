@@ -27,25 +27,26 @@ import (
 type RuntimePreparation struct {
 	runtimePreparationExtensions
 	// PreparationBytes bounds retained inputs, including detached worker bindings.
-	PreparationBytes      int
-	Monitor               manifest.Monitor
-	CheckTargetSummary    string
-	Endpoints             map[string]manifest.Endpoint
-	NotificationGroups    manifest.NotificationGroups
-	NotificationTargets   map[string][]NotificationTarget
-	NotificationTimeouts  map[string][]time.Duration
-	Conditions            []persistence.CatalogCondition
-	CatalogIndex          uint64
-	MonitorUID            string
-	ResourceVersion       string
-	Generation            uint64
-	ExecutionRevision     string
-	ProjectionVersion     string
-	RecoveryCooldown      *time.Duration
-	RecoveryMaxAttempts   *int
-	RecoveryTimeout       time.Duration
-	AbsoluteMaintenance   []AbsoluteMaintenanceWindow
-	NotificationGroupRefs []string
+	PreparationBytes        int
+	Monitor                 manifest.Monitor
+	CheckTargetSummary      string
+	Endpoints               map[string]manifest.Endpoint
+	NotificationGroups      manifest.NotificationGroups
+	NotificationTargets     map[string][]NotificationTarget
+	NotificationCredentials map[string][]string
+	NotificationTimeouts    map[string][]time.Duration
+	Conditions              []persistence.CatalogCondition
+	CatalogIndex            uint64
+	MonitorUID              string
+	ResourceVersion         string
+	Generation              uint64
+	ExecutionRevision       string
+	ProjectionVersion       string
+	RecoveryCooldown        *time.Duration
+	RecoveryMaxAttempts     *int
+	RecoveryTimeout         time.Duration
+	AbsoluteMaintenance     []AbsoluteMaintenanceWindow
+	NotificationGroupRefs   []string
 }
 
 type AbsoluteMaintenanceWindow struct{ Start, End time.Time }
@@ -376,14 +377,30 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 		}
 	}
 	if spec.Recovery != nil {
-		target, err := resolve("recovery", key, "recovery", spec.Recovery.Driver)
-		if err != nil {
-			return out, err
-		}
-		monitor.Intervention = manifest.Intervention{Action: spec.Recovery.Driver.Type, Target: target.(manifest.InterventionTarget)}
-		out.RecoveryTimeout, err = c.interventionBudget(ctx, monitor.Intervention.Target)
-		if err != nil {
-			return out, err
+		if len(spec.Recovery.Rules) != 0 {
+			monitor.Intervention.TaxonomyVersion = spec.Recovery.TaxonomyVersion
+			for i, rule := range spec.Recovery.Rules {
+				r := manifest.InterventionRule{ID: rule.ID, Match: manifest.FailureMatchFromAPI(rule.Match), None: rule.None}
+				if rule.Driver != nil {
+					slot := fmt.Sprintf("recovery.rules[%d].driver", i)
+					target, err := resolve("recovery", key, slot, *rule.Driver)
+					if err != nil {
+						return out, err
+					}
+					r.Action, r.Target = rule.Driver.Type, target.(manifest.InterventionTarget)
+				}
+				monitor.Intervention.Rules = append(monitor.Intervention.Rules, r)
+			}
+		} else {
+			target, err := resolve("recovery", key, "recovery", spec.Recovery.Driver)
+			if err != nil {
+				return out, err
+			}
+			monitor.Intervention = manifest.Intervention{Action: spec.Recovery.Driver.Type, Target: target.(manifest.InterventionTarget)}
+			out.RecoveryTimeout, err = c.interventionBudget(ctx, monitor.Intervention.Target)
+			if err != nil {
+				return out, err
+			}
 		}
 		assign(&monitor.Intervention.Retries, spec.Recovery.Retries)
 		assign(&monitor.Intervention.MaxFailures, spec.Recovery.MaxFailures)
@@ -394,6 +411,7 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 		if spec.Recovery.MaxAttempts != nil {
 			n := int(*spec.Recovery.MaxAttempts)
 			out.RecoveryMaxAttempts = &n
+			monitor.Intervention.MaxAttempts = n
 		}
 	}
 	monitor.Maintenance, out.AbsoluteMaintenance, err = runtimeMaintenance(spec.Maintenance)
@@ -423,6 +441,7 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 	}
 	out.Endpoints, out.NotificationGroups, out.NotificationTargets = map[string]manifest.Endpoint{}, manifest.NotificationGroups{}, map[string][]NotificationTarget{}
 	out.NotificationTimeouts = make(map[string][]time.Duration)
+	out.NotificationCredentials = make(map[string][]string)
 	if spec.Notifications != nil {
 		monitor.Codes = manifest.Codes{}
 		for color, rule := range *spec.Notifications {
@@ -441,6 +460,7 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 				code.Dispatch = *rule.Dispatch
 			}
 			if resolved.InlineDriver != nil {
+				out.NotificationCredentials[color] = []string{runtimeCredentialBinding(records, spec.Check.Driver, *resolved.InlineDriver)}
 				config, err := resolve("notification", key, "notifications."+color, *resolved.InlineDriver)
 				if err != nil {
 					return RuntimePreparation{}, err
@@ -460,6 +480,7 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 				group := make([]string, 0, len(resolved.Targets))
 				for _, endpoint := range resolved.Targets {
 					driver := notifications.Endpoints[endpoint.EndpointID].Spec
+					out.NotificationCredentials[color] = append(out.NotificationCredentials[color], runtimeCredentialBinding(records, spec.Check.Driver, driver))
 					config, err := resolve("notification", persistence.CatalogKey{Kind: "NotificationEndpoint", ID: endpoint.EndpointID}, "endpoint", driver)
 					if err != nil {
 						return RuntimePreparation{}, err
@@ -481,6 +502,9 @@ func (c *Catalog) PrepareRuntime(ctx context.Context, view ReadView, monitorID s
 		}
 	}
 	out.Monitor, out.CatalogIndex = monitor, view.Index()
+	if err := out.prepareRuleContracts(ctx, c); err != nil {
+		return RuntimePreparation{}, err
+	}
 	out.MonitorUID, out.ResourceVersion, out.Generation = resource.Metadata.UID, resource.Metadata.ResourceVersion, uint64(resource.Metadata.Generation)
 	for key, record := range records {
 		out.Conditions = append(out.Conditions, persistence.CatalogCondition{Key: key, UID: record.UID, Revision: record.Revision})

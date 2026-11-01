@@ -85,6 +85,7 @@ func (m *Monitor) enterIgnore(at time.Time, actor, cause, reason string, emit fu
 		}
 	}
 	m.ControlRevision = identity("ignore/" + m.ControlRevision + "/" + m.IncidentID)
+	m.resetRuleQualification("suppressed")
 	for _, id := range sortedActions(m.Actions) {
 		a := m.Actions[id]
 		if m.OwnsAction(a) && a.State == Queued && (a.Kind == "intervention" || a.Kind == "code" && !m.ControlNotification(a)) {
@@ -105,6 +106,7 @@ func (m *Monitor) leaveIgnore(at time.Time, recovered bool, emit func(string, *A
 		m.Notifications.IgnoreOutage = ""
 	}
 	m.ControlRevision = identity("unignore/" + previous)
+	m.resetRuleQualification("fresh_observations_required")
 	emit("monitor_unignored", nil)
 	if recovered {
 		m.changeNotificationEpisode(identity("ignore_recovered/"+previous), at, emit)

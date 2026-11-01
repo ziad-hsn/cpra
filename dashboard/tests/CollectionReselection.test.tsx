@@ -7,7 +7,7 @@ import { CollectionReselection } from '../src/components/CollectionReselection';
 import { SessionBoundary } from '../src/auth/SessionBoundary';
 import { DashboardSession } from '../src/api/session';
 import { reselectionOperations, type ReselectionStatus } from '../src/api/collectionReselection';
-import { fileNormalizationProfile } from '../src/api/collectionInventory';
+import { fileNormalizationProfile, type FileNormalizationProfile } from '../src/api/collectionInventory';
 
 const id = 'original-operation';
 const attempt = '12345678-1234-1234-1234-123456789abc';
@@ -23,7 +23,7 @@ beforeAll(() => { Object.defineProperty(Blob.prototype, 'arrayBuffer', { configu
 afterAll(() => { if (arrayBufferDescriptor) Object.defineProperty(Blob.prototype, 'arrayBuffer', arrayBufferDescriptor); else Reflect.deleteProperty(Blob.prototype, 'arrayBuffer'); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-async function fixture(handler: (url: URL, init: RequestInit) => Promise<Response>) {
+async function fixture(handler: (url: URL, init: RequestInit) => Promise<Response>, profile: FileNormalizationProfile = fileNormalizationProfile) {
   const requests: { url: URL; init: RequestInit }[] = [];
   const onProgress = vi.fn();
   const fetcher = vi.fn<typeof fetch>(async (input, init = {}) => {
@@ -37,7 +37,7 @@ async function fixture(handler: (url: URL, init: RequestInit) => Promise<Respons
   });
   const session = new DashboardSession({ origin: 'https://cpra.example', fetch: fetcher });
   await session.discover(); await session.signIn('PRIVATE-COMPONENT-BEARER-01234567890123456789012345678901');
-  const rendered = render(<SessionBoundary session={session}><CollectionReselection id={id} profile={fileNormalizationProfile} onProgress={onProgress} /></SessionBoundary>);
+  const rendered = render(<SessionBoundary session={session}><CollectionReselection id={id} profile={profile} onProgress={onProgress} /></SessionBoundary>);
   await screen.findByLabelText('Original collection files');
   return { session, requests, onProgress, ...rendered };
 }
@@ -137,4 +137,25 @@ it.each(['sign-out', 'unmount'] as const)('%s aborts an in-flight source and cle
   await waitFor(() => expect((source.init.body as Uint8Array).every(byte => byte === 0)).toBe(true));
   expect(writes(requests)).toHaveLength(2); expect(requests.some(request => request.url.pathname.endsWith('/verify'))).toBe(false);
   expect(screen.queryByText(/files selected/)).not.toBeInTheDocument(); privateDOM();
+});
+
+it('continues a retained v4 source identity without upgrading its normalization', async () => {
+  const profile = 'cpra.file.base.v4';
+  let submittedProfile: unknown;
+  const {requests} = await fixture(async (url, init) => {
+    if (url.pathname.endsWith('/verify')) return json({...received, normalizationProfile: profile, phase: 'verified'}, 202);
+    if (init.method === 'PUT') return json({...received, normalizationProfile: profile});
+    if (url.pathname.endsWith('/resume')) return json({...received, normalizationProfile: profile, phase: 'completed', operationUploaded: 2}, 202);
+    submittedProfile = JSON.parse(new TextDecoder().decode(init.body as Uint8Array)).normalizationProfile;
+    return json({...original, normalizationProfile: profile}, 201);
+  }, profile);
+  await selectFile(); await click('Verify original files');
+  await screen.findByRole('button', {name: 'Resume original upload'});
+  expect(submittedProfile).toBe(profile);
+  expect(requests.some(r => r.url.pathname.endsWith('/resume'))).toBe(false);
+  await click('Resume original upload');
+  await screen.findByText(/original upload is complete/);
+  expect(requests.filter(r => r.url.pathname.endsWith('/resume'))).toHaveLength(1);
+  expect(puts(requests)).toHaveLength(1);
+  privateDOM();
 });

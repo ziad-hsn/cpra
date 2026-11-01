@@ -1,3 +1,5 @@
+import { RecoveryRuleChanges } from '../components/RecoveryRules';
+import { RecoveryRulePatch } from '../components/RecoveryRulePatch';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -58,6 +60,8 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
   const operator = access.access?.role === 'operator';
   const [cursors, setCursors] = useState(['']);
   const [draft, setDraft] = useState<Draft | undefined>();
+  const [draftGeneration, setDraftGeneration] = useState(0);
+  const [ruleDraft, setRuleDraft] = useState<Monitor | undefined>();
   const [changed, setChanged] = useState(false);
   const [formError, setFormError] = useState('');
   const [comparison, setComparison] = useState<ResourceView | undefined>();
@@ -79,6 +83,8 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
     const current = { active: true };
     view.current = current;
     setDraft(creating && canCreate ? draftFor(type) : undefined);
+    setDraftGeneration(current => current + 1);
+    setRuleDraft(undefined);
     setChanged(false); setComparison(undefined); setDeleteTarget(undefined); setFormError('');
     return () => { current.active = false; };
   }, [id, creating, canCreate, type]);
@@ -91,7 +97,7 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
   }, [destination, changed, navigate]);
 
   const update = (next: Partial<Draft>) => { setDraft(current => current ? { ...current, ...next } : current); setChanged(true); };
-  const startEdit = (resource: ManagedResource) => { setDraft(draftFor(type, resource)); setComparison(undefined); setChanged(false); setFormError(''); mutation.clearFeedback(); };
+  const startEdit = (resource: ManagedResource) => { setDraft(draftFor(type, resource)); setDraftGeneration(current => current + 1); setComparison(undefined); setChanged(false); setFormError(''); mutation.clearFeedback(); };
   const finishEditor = () => {
     if (changed && !window.confirm('Discard the unsaved draft?')) return;
     setDraft(undefined); setChanged(false); setComparison(undefined); setFormError('');
@@ -161,7 +167,7 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
       : mutation.error ? `The request did not complete${mutation.error.status ? ` (HTTP ${mutation.error.status})` : ''}. Review the highlighted fields and server availability.` : '');
 
   return <FieldValidation error={mutation.error}><div className="page management-page">
-    <DirtyDraftGuard dirty={changed} />
+    {!ruleDraft && <DirtyDraftGuard dirty={changed} />}
     <div className="page-head"><div><h1>{definition.title}</h1><p className="lead">{definition.description}</p></div>
       {!id && !creating && canCreate && <Link className="btn primary" to={createRoute}>Create {definition.singular.toLowerCase()}</Link>}
       {(id || creating) && <Link className="btn ghost" to={definition.route}>Back to {definition.title.toLowerCase()}</Link>}
@@ -187,6 +193,7 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
           {type === 'monitors' && <Link className="btn" to={`/monitors/by-id/${encodeURIComponent(value.metadata.id)}`}>View monitoring and controls</Link>}
           {(type === 'monitors' || type === 'recipients') && session.can('CreateOperation') && session.can('GetMonitor') && <Link className="btn" to={`/import?${type === 'monitors' ? 'monitor' : 'recipient'}=${encodeURIComponent(value.metadata.id)}`}>Set up notifications</Link>}
           {canEdit && !detail.data?.unsupported && <button className="btn" onClick={() => startEdit(value)}>Edit {definition.singular.toLowerCase()}</button>}
+          {type === 'monitors' && operator && session.can('PatchMonitor') && detail.data?.unsupported && detail.data.recoveryEditable && value.metadata.uid && value.metadata.resourceVersion && !ruleDraft && <button className="btn" onClick={() => setRuleDraft(value as Monitor)}>Edit intervention rules only</button>}
           {canDelete && <button className="btn" disabled={!value.metadata.uid || !value.metadata.resourceVersion} onClick={() => setDeleteTarget(structuredClone(value))}>Delete {definition.singular.toLowerCase()}</button>}
         </div></div>
         <p>Stable ID: <span className="mono">{value.metadata.id}</span> · Version: <span className="mono">{value.metadata.resourceVersion || 'Unavailable'}</span></p>
@@ -194,10 +201,11 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
         {type === 'credentials' && <p>Value availability: {object(value.status) && typeof value.status.available === 'boolean' ? value.status.available ? 'Available' : 'Unavailable' : 'Not reported'}</p>}
         {detail.data?.unsupported && <p role="status">{detail.data.unsupported}</p>}
         {type === 'monitors' && <MonitorStatusDetails monitor={value as Monitor} />}
-        <ReadSpec type={type} spec={value.spec as Record<string, unknown>} />
+        {!ruleDraft && <ReadSpec type={type} spec={value.spec as Record<string, unknown>} />}
       </div>}
     </> : null}
     {creating && !canCreate && <p>Your identity cannot create these resources.</p>}
+    {ruleDraft && <RecoveryRulePatch monitor={ruleDraft} onClose={() => setRuleDraft(undefined)} />}
     {draft && <form className="card management-form" aria-label={`${creating ? 'Create' : 'Edit'} ${definition.singular.toLowerCase()}`} onSubmit={event => { event.preventDefault(); if (event.currentTarget.reportValidity()) void save(); }}>
       <h2>{draft.baseline ? 'Edit' : 'Create'} {definition.singular.toLowerCase()}</h2>
       <label className="management-field"><span>Stable ID</span><FieldInput field="metadata.id" className="input" required value={draft.id} readOnly={!!draft.baseline} onChange={event => update({ id: event.target.value })} /></label>
@@ -205,7 +213,7 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
       <label className="management-field"><span>Name</span><FieldInput field="metadata.name" className="input" value={draft.name} onChange={event => update({ name: event.target.value, namePresent: true })} /></label>
       {draft.baseline && <p className="muted">Editing version <span className="mono">{draft.baseline.metadata.resourceVersion}</span>. Background updates do not replace this draft.</p>}
       <LabelFields labels={draft.labels} onChange={labels => update({ labels })} />
-      {type === 'monitors' ? <MonitorFields spec={draft.spec} onChange={spec => update({ spec })} /> : type === 'credentials' ? <>
+      {type === 'monitors' ? <MonitorFields key={draftGeneration} spec={draft.spec} onChange={spec => update({ spec })} /> : type === 'credentials' ? <>
         <label className="management-field"><span>Description</span><FieldInput field="spec.description" className="input" value={typeof draft.spec.description === 'string' ? draft.spec.description : ''} onChange={event => update({ spec: { ...draft.spec, description: event.target.value } })} /></label>
         {draft.baseline && <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={draft.replaceSecret} onChange={event => update({ replaceSecret: event.target.checked, secret: '' })} />Replace the secret value</label>}
         {draft.replaceSecret && <label className="management-field"><span>New secret value</span><FieldInput field="spec.value" className="input" type="password" autoComplete="off" spellCheck={false} value={draft.secret} onChange={event => update({ secret: event.target.value })} /></label>}
@@ -220,6 +228,7 @@ export default function ManagementResources({ type }: { type: ResourceType }) {
         <ReadSpec type={type} spec={comparison.resource.spec as Record<string, unknown>} />
         {comparison.unsupported ? <p>{comparison.unsupported}</p> : <button type="button" className="btn" onClick={() => { if (window.confirm('Discard this draft and start a new edit from the displayed latest resource?')) startEdit(comparison.resource); }}>Discard draft and use latest</button>}
       </section>}
+      {type === 'monitors' && (Array.isArray((draft.spec.recovery as { rules?: unknown } | undefined)?.rules) || Array.isArray(((draft.baseline as Monitor | undefined)?.spec.recovery)?.rules)) && <RecoveryRuleChanges before={(draft.baseline as Monitor | undefined)?.spec.recovery} after={draft.spec.recovery} />}
       <div className="row" style={{ gap: 12 }}><button className="btn primary" type="submit" disabled={mutation.pending || mutation.error?.reason === 'unconfirmed'}>{mutation.pending ? 'Saving…' : 'Save'}</button><button type="button" className="btn ghost" onClick={finishEditor}>Cancel editing</button></div>
     </form>}
     {deleteTarget && <ConfirmDialog title={`Delete ${deleteTarget.metadata.name || deleteTarget.metadata.id}?`} pending={mutation.pending} onCancel={() => setDeleteTarget(undefined)} onConfirm={() => void remove()}><p>The server blocks deletion while other resources reference this object. Recorded history and unknown actions are preserved.</p></ConfirmDialog>}

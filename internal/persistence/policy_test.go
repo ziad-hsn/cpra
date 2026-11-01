@@ -357,6 +357,11 @@ func TestPolicyRecoveryBudgetAndCooldownSurviveRestart(t *testing.T) {
 	m, _ = monitorWithActionHistory(t, s, m.ID)
 	a := interventionAction(t, m)
 	submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: a.NotBefore})
+	startedRecord, found, err := s.Action(a.ID)
+	if err != nil || !found {
+		t.Fatal(err)
+	}
+	a = startedRecord.Action
 	failedAt := a.NotBefore.Add(time.Second)
 	submit(t, s, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, At: failedAt, Outcome: "failure", Retryable: true})
 	submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: 2, At: failedAt.Add(time.Second), Outcome: "failure"})

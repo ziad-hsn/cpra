@@ -50,6 +50,7 @@ func TestWorkerUnknownReceiptRequiresRetainedActionOnNativeImport(t *testing.T) 
 				if err != nil {
 					t.Fatal(err)
 				}
+				original := row
 				switch corruption {
 				case "missing":
 					delete(snap.collections.actions.current, id)
@@ -80,10 +81,22 @@ func TestWorkerUnknownReceiptRequiresRetainedActionOnNativeImport(t *testing.T) 
 					versions := snap.collections.actions.versions[id]
 					versions[len(versions)-1] = data
 				}
+				// Keep the export accounting consistent with the damaged fixture so
+				// import reaches the worker/action join rather than a byte-count gate.
+				if corruption != "intact" {
+					if err := snap.collections.actions.accounting.adjust(original, false); err != nil {
+						t.Fatal(err)
+					}
+					if corruption != "missing" {
+						if err := snap.collections.actions.accounting.adjust(row, true); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
 				// Bypass producer validation to exercise the native import boundary
 				// with an internally checksummed but semantically damaged snapshot.
 				var raw bytes.Buffer
-				raw.WriteString(actionWorkerSnapshotMagic)
+				raw.WriteString(workerRecoveryRulesSnapshotMagic)
 				if err := json.NewEncoder(&raw).Encode(snap.image); err != nil {
 					t.Fatal(err)
 				}

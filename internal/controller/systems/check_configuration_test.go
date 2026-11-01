@@ -67,7 +67,7 @@ func TestControllerCAFailureDoesNotCreateAnOutage(t *testing.T) {
 
 func TestCheckPreparationHoldsQueuedRecoveryWithoutRedispatch(t *testing.T) {
 	for _, repair := range []bool{false, true} {
-		t.Run(map[bool]string{false: "expires", true: "repaired"}[repair], func(t *testing.T) {
+		t.Run(map[bool]string{false: "held_without_start", true: "repaired"}[repair], func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				world := ecs.NewWorld()
 				ent := interventionMonitor(t, &world, "http://127.0.0.1:1")
@@ -89,11 +89,11 @@ func TestCheckPreparationHoldsQueuedRecoveryWithoutRedispatch(t *testing.T) {
 						t.Fatal("actual observation did not release original queued recovery")
 					}
 				} else {
-					time.Sleep(time.Until(original.Deadline) + time.Second)
+					time.Sleep(2*original.ExecutionBudget + time.Second)
 					system.dispatchActions(time.Now())
 					current, _ := monitorWithActionHistory(t, system.store, m.ID)
-					if len(queue.admitted) != 0 || current.Actions[original.ID].State != persistence.Cancelled || system.lastError != nil {
-						t.Fatal("blocked recovery did not expire without dispatch", system.lastError)
+					if len(queue.admitted) != 0 || current.Actions[original.ID].State != persistence.Queued || !current.Actions[original.ID].Deadline.IsZero() || current.Actions[original.ID].ExecutionBudget != original.ExecutionBudget || system.lastError != nil {
+						t.Fatal("local preparation consumed an unstarted recovery budget", system.lastError)
 					}
 				}
 			})

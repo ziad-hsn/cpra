@@ -27,7 +27,7 @@ func Validate(m *Manifest) error {
 // fields and per-type pulse config requirements).
 func ValidateMonitor(m *Monitor) error {
 	settings := api.MonitorSpec{Check: api.CheckSpec{Interval: m.Pulse.Interval.String(), Timeout: m.Pulse.Timeout.String(), Retries: api.Pointer(int64(m.Pulse.Retries)), MaxFailures: api.Pointer(int64(m.Pulse.MaxFailures)), HealthyThreshold: api.Pointer(int64(m.Pulse.HealthyThreshold)), UnhealthyThreshold: api.Pointer(int64(m.Pulse.UnhealthyThreshold))}, AutoIgnore: m.AutoIgnore}
-	if m.Intervention.Action != "" {
+	if m.Intervention.Action != "" || m.Intervention.Rules != nil {
 		settings.Recovery = &api.RecoverySpec{Retries: api.Pointer(int64(m.Intervention.Retries)), MaxFailures: api.Pointer(int64(m.Intervention.MaxFailures)), MaxAttempts: api.Pointer(int64(m.Intervention.MaxAttempts))}
 	}
 	colors := make(map[string]api.AlertRule, len(m.Codes))
@@ -70,6 +70,19 @@ func ValidateMonitor(m *Monitor) error {
 			return api.PrefixValidationError("intervention", err)
 		}
 	}
+	if m.Intervention.Rules != nil || m.Intervention.TaxonomyVersion != "" {
+		policy, err := m.Intervention.RecoveryRules()
+		if err != nil {
+			return api.PrefixValidationError("intervention", err)
+		}
+		check, err := normalizedDriverSettings("check", m.Pulse.Type, m.Pulse.Config)
+		if err != nil {
+			return err
+		}
+		if _, _, err = api.CompileRecoveryRules(api.DriverConfig{Type: m.Pulse.Type, Config: check}, policy); err != nil {
+			return api.PrefixValidationError("intervention", err)
+		}
+	}
 	if m.Intervention.Action == "a2a" {
 		cfg, ok := m.Intervention.Target.(*InterventionTargetA2A)
 		if !ok {
@@ -92,7 +105,7 @@ func ValidateMonitor(m *Monitor) error {
 		switch notification.Trigger {
 		case "", "state_change":
 		case "recovery_failed", "recovery_exhausted":
-			if color != "red" || m.Intervention.Action == "" {
+			if color != "red" || m.Intervention.Action == "" && len(m.Intervention.Rules) == 0 {
 				return api.InvalidField("codes."+color+".trigger", "notificationTrigger")
 			}
 		default:
@@ -211,9 +224,17 @@ func ValidateMonitorReferences(mon *Monitor, endpoints map[string]Endpoint, grou
 // Normalize into the same inert schema used by the SDK and management API.
 // Provider secrets are never included in validation error messages.
 func validateDriverSettings(category, kind string, config any) error {
+	normalized, err := normalizedDriverSettings(category, kind, config)
+	if err != nil {
+		return err
+	}
+	return api.ValidateDriverSettings(category, api.DriverConfig{Type: kind, Config: normalized})
+}
+
+func normalizedDriverSettings(category, kind string, config any) (json.RawMessage, error) {
 	raw, err := json.Marshal(config)
 	if err != nil {
-		return fmt.Errorf("driver configuration cannot be encoded")
+		return nil, fmt.Errorf("driver configuration cannot be encoded")
 	}
 	if target, ok := config.(*InterventionTargetDocker); ok && target.OperationTimeout == 0 {
 		var fields map[string]json.RawMessage
@@ -221,11 +242,7 @@ func validateDriverSettings(category, kind string, config any) error {
 		delete(fields, "operation_timeout") // Zero selects the manifest default.
 		raw, _ = json.Marshal(fields)
 	}
-	normalized, err := api.NormalizeManifestDriver(category, kind, raw)
-	if err != nil {
-		return err
-	}
-	return api.ValidateDriverSettings(category, api.DriverConfig{Type: kind, Config: normalized})
+	return api.NormalizeManifestDriver(category, kind, raw)
 }
 
 // Translate only diagnostic schema names; values and validation rules are shared

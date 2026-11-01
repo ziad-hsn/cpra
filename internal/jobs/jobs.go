@@ -251,14 +251,14 @@ func codeAlertTemplateFor(color string) codeAlertTemplate {
 			Severity:  "critical",
 			Summary:   "Service outage detected after repeated health check failures",
 			Action:    "Escalate immediately and engage on-call responders",
-			NextSteps: "Perform manual recovery and review related service telemetry",
+			NextSteps: "Review current health, intervention policy and action evidence before choosing a response",
 		}
 	case "yellow":
 		return codeAlertTemplate{
 			Title:     "DEGRADED ALERT",
 			Status:    "DEGRADED",
 			Severity:  "warning",
-			Summary:   "A health check reported a warning or failure; the unhealthy threshold may not yet be reached",
+			Summary:   "A health check reported a warning or failure",
 			Action:    "Investigate partial outage or performance regression",
 			NextSteps: "Validate dependencies, review recent changes, and monitor closely",
 		}
@@ -737,7 +737,7 @@ func (p *PulseICMPJob) Execute() (result Result) {
 	case icmpPingerSem <- struct{}{}:
 		defer func() { <-icmpPingerSem }()
 	case <-ctx.Done():
-		result.Err = ctx.Err()
+		result.Err = &checkUnavailableError{cause: ctx.Err()}
 		return
 	}
 	ips, err := net.DefaultResolver.LookupIPAddr(ctx, p.Host)
@@ -773,7 +773,7 @@ func (p *PulseICMPJob) Execute() (result Result) {
 			return
 		}
 		if err == nil {
-			err = fmt.Errorf("no ICMP replies received")
+			err = &checkConditionError{code: "icmp.no_reply"}
 		}
 		result.Err = err
 	}
@@ -889,7 +889,7 @@ func (p *PulseUDPJob) Execute() (result Result) {
 					var n int
 					n, err = conn.Read(buf)
 					if err == nil && n == 0 {
-						err = fmt.Errorf("empty UDP response")
+						err = &checkConditionError{code: "udp.empty_response"}
 					}
 				}
 			}
@@ -1010,7 +1010,9 @@ func (p *PulseDockerJob) Execute() (result Result) {
 			return Result{ID: p.ID, Ent: p.Entity, Err: nil, Payload: payload}
 		}
 		if err == nil {
-			lastErr = fmt.Errorf("container %q is not running", p.Container)
+			lastErr = &checkConditionError{code: "docker.not_running"}
+		} else if errdefs.IsNotFound(err) {
+			lastErr = &checkConditionError{code: "docker.not_found"}
 		} else {
 			lastErr = err
 		}

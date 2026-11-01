@@ -17,6 +17,9 @@ func newLocalBootstrapCommand() *cobra.Command {
 			use, short = "discard", "Audit and discard only the exact unadmitted loading stage"
 		}
 		command := &cobra.Command{Use: use, Short: short, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+			if request.DataDirectory == "" || request.RuntimeConfig == "" {
+				return errors.New("--data-dir and --runtime-config are both required; use cpractl local bootstrap inspect --data-dir /absolute/state --runtime-config /absolute/runtime.yaml while the owner is stopped")
+			}
 			if discard {
 				report, err := localadmin.DiscardBootstrap(cmd.Context(), request)
 				if report.AttemptID != "" {

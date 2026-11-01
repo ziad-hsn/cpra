@@ -132,7 +132,7 @@ func (h *workerSessionHTTP) poll(w http.ResponseWriter, r *http.Request) {
 	}
 	capabilities := make([]persistence.WorkerSessionCapability, len(request.Capabilities))
 	for i, capability := range request.Capabilities {
-		capabilities[i] = persistence.WorkerSessionCapability{JobTypeID: capability.JobTypeID, Version: capability.Version, Category: string(capability.Kind)}
+		capabilities[i] = persistence.WorkerSessionCapability{JobTypeID: capability.JobTypeID, Version: capability.Version, Category: string(capability.Kind), ProtocolVersion: capability.ProtocolVersion}
 	}
 	command := persistence.WorkerPollRequest{
 		ServerID: request.ServerID, WorkerID: request.WorkerID, ClientSessionID: request.ClientSessionID,

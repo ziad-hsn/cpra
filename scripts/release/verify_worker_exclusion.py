@@ -22,6 +22,12 @@ ROOT = Path(__file__).resolve().parents[2]
 MODULE = "github.com/ziad-hsn/cpra"
 SDK_MODULE = MODULE + "/sdk/go"
 CASES = (
+    ("sdk/go/api", "ExternalFailureContract", "var _ excluded.ExternalFailureContract"),
+    ("sdk/go/api", "WorkerFailure", "var _ excluded.WorkerFailure"),
+    ("sdk/go/api", "CompileExternalRulePredicates", "var _ = excluded.CompileExternalRulePredicates"),
+    ("sdk/go/api", "CanonicalWorkerFailure", "var _ = excluded.CanonicalWorkerFailure"),
+    ("internal/persistence", "NewExternalRecoveryRules", "var _ = excluded.NewExternalRecoveryRules"),
+    ("internal/persistence", "WorkerRecoveryRulesFormatVersion", "var _ = excluded.WorkerRecoveryRulesFormatVersion"),
     ("internal/persistence", "RecoveryNotificationWorkerFormatVersion", "var _ = excluded.RecoveryNotificationWorkerFormatVersion"),
     ("internal/persistence", "AgentWorkerFormatVersion", "var _ = excluded.AgentWorkerFormatVersion"),
     ("internal/persistence", "CheckWorkerExecutionCapacity", "var _ = (*excluded.Store).CheckWorkerExecutionCapacity"),

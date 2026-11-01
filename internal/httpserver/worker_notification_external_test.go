@@ -104,6 +104,7 @@ func TestWorkerBlueReplacementPreservesDeadlineAndFencesOldOffer(t *testing.T) {
 				intent := record.Intent.Clone()
 				intent.ID, intent.Revision, intent.ActionID = uuid.NewString(), uuid.NewString(), action.ID
 				intent.Scheduled, intent.Deadline = action.NotBefore, action.Deadline
+				intent.ExecutionBudget = action.ExecutionBudget
 				intent.Notification = nil
 				intent.Payload = persistence.WorkerExecutionIntent{}.Payload
 				prepared, err := f.handler.catalog.PrepareWorkerExecution(t.Context(), intent)
@@ -149,7 +150,7 @@ func TestWorkerBlueReplacementPreservesDeadlineAndFencesOldOffer(t *testing.T) {
 				current, _ := f.store.Get(record.Intent.MonitorID)
 				updated, ok := current.Actions[closure.ID]
 				if ok && updated.ReviewNotice != nil && updated.ReviewNotice.Health == "unhealthy" {
-					if updated.State != persistence.Queued || updated.ReviewNotice.AlertID != closure.ReviewNotice.AlertID || updated.ReviewNotice.Phase != "close" || !updated.Deadline.Equal(closure.Deadline) {
+					if updated.State != persistence.Queued || updated.ReviewNotice.AlertID != closure.ReviewNotice.AlertID || updated.ReviewNotice.Phase != "close" || !updated.Deadline.Equal(closure.Deadline) || updated.ExecutionBudget != closure.ExecutionBudget {
 						t.Fatal("closure assessment changed original identity or budget")
 					}
 					break
@@ -173,7 +174,7 @@ func TestWorkerBlueReplacementPreservesDeadlineAndFencesOldOffer(t *testing.T) {
 				}
 			}
 			m, replacement := waitClosure(closure.ID)
-			if replacement.ID == closure.ID || !replacement.Deadline.Equal(closure.Deadline) {
+			if replacement.ID == closure.ID || !replacement.Deadline.Equal(closure.Deadline) || replacement.ExecutionBudget != closure.ExecutionBudget || closure.ExecutionBudget <= 0 || !closure.Deadline.IsZero() {
 				t.Fatal("replacement changed original budget")
 			}
 			prepare(m, replacement)
@@ -182,8 +183,16 @@ func TestWorkerBlueReplacementPreservesDeadlineAndFencesOldOffer(t *testing.T) {
 				t.Fatal("replacement offer lost current health")
 			}
 			grant, err := client.Start(t.Context(), startWorkerOffer(batch.Items[0], api.StartModeBegin))
-			if err != nil || grant.Disposition != api.StartDispositionGranted || !grant.Deadline.Equal(closure.Deadline) {
-				t.Fatal("replacement did not retain authorized deadline", err)
+			if err != nil || grant.Disposition != api.StartDispositionGranted {
+				t.Fatal("replacement start", err)
+			}
+			started, exists, err := f.store.ActionContext(t.Context(), replacement.ID)
+			if err != nil || !exists || started.ExecutionBudget != closure.ExecutionBudget || !grant.Deadline.Equal(started.StartedAt.Add(closure.ExecutionBudget)) || !grant.Deadline.Equal(started.Deadline) {
+				t.Fatal("replacement did not bind its original budget to the committed start", err)
+			}
+			repeated, err := client.Start(t.Context(), startWorkerOffer(batch.Items[0], api.StartModeBegin))
+			if err != nil || repeated.Disposition != api.StartDispositionStarted || repeated.GrantID != grant.GrantID || !repeated.Deadline.Equal(grant.Deadline) {
+				t.Fatal("repeated start changed the original grant or renewed its deadline", err)
 			}
 			underlying, exists, err := f.store.ActionContext(t.Context(), closure.ReviewNotice.ActionID)
 			if err != nil || !exists || underlying.State != persistence.Unknown || !underlying.Held {

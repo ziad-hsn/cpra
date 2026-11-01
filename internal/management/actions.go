@@ -52,6 +52,9 @@ func (c *Catalog) PrepareAction(ctx context.Context, action, id string, req api.
 	command := persistence.Command{At: time.Now().UTC()}
 	switch action {
 	case "review":
+		if req.RuleID != "" || req.DecisionRevision != "" || req.ConfigurationRevision != "" {
+			return nil, persistence.ErrControlInvalid
+		}
 		if req.Resolution != "accepted" && req.Resolution != "rejected" && req.Resolution != "inconclusive" || !validEvidenceRefs(req.EvidenceRefs) {
 			return nil, persistence.ErrControlInvalid
 		}
@@ -79,7 +82,7 @@ func (c *Catalog) PrepareAction(ctx context.Context, action, id string, req api.
 		command.Kind = "manual_recovery"
 		command.MonitorID = id
 		command.Guard = &guard
-		command.ManualRecovery = &persistence.ManualRecoveryCommand{MonitorUID: uid, ExpectedControlRevision: req.Revision, Revision: op, OperationID: op, Reason: req.Reason}
+		command.ManualRecovery = &persistence.ManualRecoveryCommand{RuleID: req.RuleID, ExpectedDecision: req.DecisionRevision, ExpectedConfiguration: req.ConfigurationRevision, MonitorUID: uid, ExpectedControlRevision: req.Revision, Revision: op, OperationID: op, Reason: req.Reason}
 	default:
 		return nil, persistence.ErrControlInvalid
 	}

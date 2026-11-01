@@ -8,7 +8,7 @@ import (
 
 func TestCheckControlFencePreservesHistoricalFormats(t *testing.T) {
 	command := Command{Kind: "pulse", At: time.Now().UTC(), MonitorID: "manifest-check", Revision: "manifest-v1", Generation: 1, Outcome: "success", CheckControlRevision: "control-revision"}
-	if got := commandWriteFormat(command); got != ActionFormatVersion {
+	if got := commandWriteFormat(command); got != DispatchFormatVersion {
 		t.Fatalf("new control fence written as format %d", got)
 	}
 	for _, version := range []int{FormatVersion, CatalogFormatVersion} {
@@ -25,7 +25,7 @@ func TestCheckControlFencePreservesHistoricalFormats(t *testing.T) {
 		}
 	}
 	command.CheckControlRevision = ""
-	if got := commandWriteFormat(command); got != ActionFormatVersion {
+	if got := commandWriteFormat(command); got != DispatchFormatVersion {
 		t.Fatalf("unfenced observation lost its lifecycle format: %d", got)
 	}
 }

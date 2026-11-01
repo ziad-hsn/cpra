@@ -1,0 +1,40 @@
+# Validate and test this policy before enabling it for a designated target.
+monitors:
+  - id: checkout
+    name: checkout
+    enabled: false
+    pulse_check:
+      type: http
+      interval: 60s
+      timeout: 5s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      config:
+        url: https://checkout.example.test/health
+    intervention:
+      taxonomy_version: "1"
+      max_attempts: 1
+      rules:
+        - id: leave-authentication-to-operator
+          match:
+            codes: [unexpected_http_status]
+            http_statuses: [401, 403]
+          none: true
+        - id: restart-refused-container
+          match:
+            codes: [network.connection_refused]
+            phases: [connect]
+          action: docker
+          target:
+            container: designated-checkout-container
+            timeout: 10s
+            operation_timeout: 60s
+        - id: agent-on-service-unavailable
+          match:
+            codes: [unexpected_http_status]
+            http_statuses: [503]
+          action: a2a
+          target:
+            url: https://agent.example.test
+            task_timeout: 60s
+            poll_interval: 5s

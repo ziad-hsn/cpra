@@ -48,11 +48,15 @@ func (c *Catalog) WorkerAssignments(ctx context.Context, authority persistence.W
 			return empty, err
 		}
 		in := record.Intent
+		contract, exists, err := c.store.LookupJobTypeVersion(ctx, in.JobType.JobTypeID, in.JobType.Version)
+		if err != nil || !exists || contract.Version.Record.UID != in.JobType.JobTypeUID {
+			return empty, persistence.ErrWorkerExecutionConflict
+		}
 		out.Items = append(out.Items, api.Assignment{ServerID: response.ServerID, WorkerUID: response.WorkerUID,
 			SessionID: response.SessionID, ExecutionID: in.ID, ExecutionRevision: in.Revision,
 			LeaseID: offer.LeaseID, Deadline: offer.Deadline, MonitorID: in.MonitorID, IncarnationUID: in.MonitorUID,
 			JobTypeID: in.JobType.JobTypeID, JobTypeUID: in.JobType.JobTypeUID, JobTypeVersion: in.JobType.Version,
-			Kind: in.Category, Parameters: descriptor.Parameters(), CredentialProfile: descriptor.CredentialProfile(), Notification: workerNotification(in.Notification)})
+			ProtocolVersion: contract.Version.ProtocolVersion, FailureCodes: append([]string(nil), contract.Version.FailureCodes...), Kind: in.Category, Parameters: descriptor.Parameters(), CredentialProfile: descriptor.CredentialProfile(), Notification: workerNotification(in.Notification)})
 	}
 	encoded, err := json.Marshal(out)
 	encodedBytes := len(encoded)

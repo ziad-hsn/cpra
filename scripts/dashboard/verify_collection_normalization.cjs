@@ -8,7 +8,7 @@ const { isDeepStrictEqual } = require('node:util');
 const [runtime, wasm, ...natives] = process.argv.slice(2);
 if (!runtime || !wasm || natives.length === 0) throw new Error('Expected runtime, Wasm and native parser artifacts');
 require(path.resolve(runtime));
-const fixtures = JSON.parse(fs.readFileSync(path.join(__dirname, '../../sdk/go/collection/testdata/file-base-v3.json'), 'utf8'));
+const fixtures = JSON.parse(fs.readFileSync(path.join(__dirname, '../../sdk/go/collection/testdata/file-base-v5.json'), 'utf8'));
 const check = (condition, description) => { if (!condition) throw new Error(description); };
 (async () => {
   const go = new Go();
@@ -45,12 +45,34 @@ const check = (condition, description) => { if (!condition) throw new Error(desc
         recovery: { driver: { type: 'webhook', config: { url: 'https://example.invalid/PRIVATE_RECOVERY' } } }, notifications: fixture.rules } }));
     let advisories;
     const result = globalThis.cpraDecodeCollection(new Uint8Array(raw), (_id, _document, _item, _json, _coordinates, warnings) => {
-      check(typeof warnings === 'string' && warnings.length <= 4096, 'Wasm advisory boundary is unbounded');
+      check(typeof warnings === 'string' && warnings.length <= 16384, 'Wasm advisory boundary is unbounded');
       advisories = JSON.parse(warnings); return true;
     });
     check(result.valid && Array.isArray(advisories) && advisories.length === Number(fixture.warn), `Wasm shared configuration warning differs: ${fixture.name}; valid=${result.valid}; field=${result.field ?? 'none'}; reason=${result.reason ?? 'none'}; warningCount=${Array.isArray(advisories) ? advisories.length : 'unavailable'}`);
     check(!JSON.stringify(advisories).includes('PRIVATE_'), 'Wasm advisory exposed configuration values');
     if (fixture.warn) check(advisories[0].field === 'spec.notifications.blue' && advisories[0].reason === 'unknownRecoveryDestination', 'Wasm advisory lost its reviewed field/reason');
   }
-  process.stdout.write(JSON.stringify({ result: 'passed', profile: fixtures.profile, fixedCases: fixtures.cases.length, warningCases: warningCases.length, nativeBuilds: natives.length, wasmBuilds: 1 }) + '\n', () => process.exit(0));
+  for (const count of [2, 32]) {
+    const rules = Array.from({length: count}, (_, i) => ({id: `r${i}`, match: {codes: ['unexpected_http_status'], httpStatuses: i === 0 ? [100] : [100, 100 + i]}, none: true}));
+    const raw = Buffer.from(JSON.stringify({apiVersion: 'cpra.io/v2', kind: 'Monitor', metadata: {id: 'overlap'}, spec: {check: {interval: '60s', timeout: '5s', driver: {type: 'http', config: {url: 'https://example.invalid'}}}, recovery: {taxonomyVersion: '1', rules}}}));
+    let warnings;
+    const result = globalThis.cpraDecodeCollection(new Uint8Array(raw), (_id, _doc, _item, _json, _coordinates, advisories) => {
+      check(advisories.length <= 16384, 'Overlap advisories exceed byte limit'); warnings = JSON.parse(advisories); return true;
+    });
+    check(result.valid && warnings.length === count - 1, 'Valid overlapping rules rejected or warning count lost');
+    check(warnings.every((w, i) => w.reason === 'partialOverlap' && w.field === `spec.recovery.rules[${i+1}]`), 'Overlap advisory contract differs');
+  }
+  {
+    const rules = Array.from({length: 32}, (_, i) => ({id: `r${i}`, match: {codes: ['unexpected_http_status'], httpStatuses: i === 0 ? [100] : [100, 100 + i]}, ...(i === 0 ? {driver: {type: 'webhook', config: {url: 'https://example.invalid/PRIVATE_RECOVERY'}}} : {none: true})}));
+    const raw = Buffer.from(JSON.stringify({apiVersion: 'cpra.io/v2', kind: 'Monitor', metadata: {id: 'all-warnings'}, spec: {check: {interval: '60s', timeout: '5s', driver: {type: 'http', config: {url: 'https://example.invalid'}}}, recovery: {taxonomyVersion: '1', rules}, notifications: {red: {trigger: 'recovery_failed', endpointRefs: ['operations']}}}}));
+    let warnings;
+    const result = globalThis.cpraDecodeCollection(new Uint8Array(raw), (_id, _doc, _item, _json, _coordinates, advisories) => {
+      check(advisories.length <= 16384, 'Combined advisories exceed byte limit'); warnings = JSON.parse(advisories); return true;
+    });
+    check(result.valid && warnings.length === 33, 'Complete valid warning set was truncated or rejected');
+    check(warnings.some(w => w.field === 'spec.notifications.red.trigger' && w.reason === 'recoveryOnlyCoverage'), 'Recovery coverage advisory missing');
+    check(warnings.some(w => w.field === 'spec.notifications.blue' && w.reason === 'unknownRecoveryDestination'), 'Unknown recovery advisory missing');
+    check(!JSON.stringify(warnings).includes('PRIVATE_'), 'Combined advisories exposed a value');
+  }
+  process.stdout.write(JSON.stringify({ result: 'passed', profile: fixtures.profile, fixedCases: fixtures.cases.length, warningCases: warningCases.length + 3, nativeBuilds: natives.length, wasmBuilds: 1 }) + '\n', () => process.exit(0));
 })().catch(error => { process.stderr.write(error.message + '\n', () => process.exit(1)); });

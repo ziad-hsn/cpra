@@ -19,7 +19,15 @@ func (p *DynamicWorkerPool) dispatchFair() {
 		if !ok {
 			panic("fair dispatch requires a fair queue")
 		}
-		job, err := q.acquire(p.antsPool.Cap())
+		var job jobs.Job
+		var err error
+		if p.workCtx.Err() != nil {
+			// Cancelled work needs no destination/rate reservation. Dispatch
+			// observes the cancelled context before authorization or provider I/O.
+			job, err = p.Queue().Dequeue()
+		} else {
+			job, err = q.acquire(p.antsPool.Cap())
+		}
 		if errors.Is(err, ErrQueueClosed) && p.stopping.Load() != 0 {
 			return
 		}

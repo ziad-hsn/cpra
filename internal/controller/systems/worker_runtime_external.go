@@ -186,7 +186,7 @@ func (s *DurableSystem) dispatchWorkerChecks() {
 	}
 }
 
-func (s *DurableSystem) queueWorker(ent ecs.Entity, key manifest.ExternalRuntimeKey, actionID string, scheduled time.Time, timeout time.Duration) bool {
+func (s *DurableSystem) queueWorker(ent ecs.Entity, key manifest.ExternalRuntimeKey, actionID string, scheduled time.Time, timeout time.Duration, originalRevision ...string) bool {
 	r := s.workerRuntime
 	state := s.states.Get(ent)
 	if r == nil || s.stopping.Load() || r.preparing >= workerDispatchCapacity {
@@ -216,6 +216,9 @@ func (s *DurableSystem) queueWorker(ent ecs.Entity, key manifest.ExternalRuntime
 		Source: persistence.CatalogKey{Kind: key.SourceKind, ID: key.SourceID}, SourceUID: key.SourceUID, SourceRevision: key.SourceRevision,
 		JobType: persistence.JobTypeReference{JobTypeID: key.JobType.JobTypeID, JobTypeUID: key.JobType.JobTypeUID,
 			Version: key.JobType.Version, Revision: key.JobType.Revision, Category: key.JobType.Category}, Guard: p.guard.Clone()}
+	if len(originalRevision) > 0 {
+		in.MonitorRevision = originalRevision[0]
+	}
 	if actionID == "" {
 		in.Generation = state.PulseGeneration + 1
 		ticket := s.checks[ent.ID()].workerSchedule
@@ -259,22 +262,25 @@ func (s *DurableSystem) dispatchWorkerCheck(ent ecs.Entity) bool {
 	return true
 }
 
-func (s *DurableSystem) dispatchWorkerAction(ent ecs.Entity, action persistence.Action) bool {
+func (s *DurableSystem) dispatchWorkerAction(ent ecs.Entity, action persistence.Action, endpoint int) bool {
 	j := s.jobs.Get(ent)
 	if j == nil || j.ExternalJobs == nil {
 		return false
 	}
 	binding := j.ExternalJobs.Recovery
+	if action.Rule.RuleID != "" {
+		binding = j.ExternalJobs.RecoveryRules[action.Rule.RuleID]
+	}
 	if action.Kind == "code" {
 		binding = nil
-		if slots := j.ExternalJobs.Notifications[action.Color]; action.Endpoint >= 0 && action.Endpoint < len(slots) {
-			binding = slots[action.Endpoint]
+		if slots := j.ExternalJobs.Notifications[action.Color]; endpoint >= 0 && endpoint < len(slots) {
+			binding = slots[endpoint]
 		}
 	}
 	if binding == nil {
 		return false
 	}
-	s.queueWorker(ent, binding.Key, action.ID, action.NotBefore, 24*time.Hour)
+	s.queueWorker(ent, binding.Key, action.ID, action.NotBefore, 24*time.Hour, action.Revision)
 	return true
 }
 

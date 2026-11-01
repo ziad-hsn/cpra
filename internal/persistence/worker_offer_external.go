@@ -81,7 +81,7 @@ func (f *machine) workerOfferOrder(c WorkerSessionCommand) []workerOfferCandidat
 			continue
 		}
 		version, ok := typ.Versions[cap.Version]
-		if !ok || version.Record.UID != typ.Current.Record.UID || version.Category != cap.Category {
+		if !ok || version.Record.UID != typ.Current.Record.UID || version.Category != cap.Category || effectiveWorkerProtocol(cap.ProtocolVersion) != version.ProtocolVersion {
 			continue
 		}
 		ref := JobTypeReference{JobTypeID: cap.JobTypeID, JobTypeUID: version.Record.UID, Version: cap.Version, Revision: version.Record.Revision, Category: cap.Category}

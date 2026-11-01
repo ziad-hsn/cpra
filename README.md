@@ -29,6 +29,7 @@ lists supported source interfaces, tested environments and distribution status.
 
 [Documentation](docs/index.md) · [Quickstart](docs/tutorials/quickstart.md) ·
 [Configuration](docs/reference/config-schema.md) · [Drivers](docs/reference/jobs-reference.md) ·
+[Intervention rules](docs/intervention-rules.md) ·
 [API](docs/reference/api-reference.md) · [Go SDK](sdk/go/README.md)
 
 The [published website](https://ziad-hsn.github.io/cpra/) is updated separately;
@@ -171,6 +172,13 @@ only proven transient failures with no external effect can retry. Neither a
 restart nor exhausted retries starts another budget. A pending recovery notice
 can report the original outage's recovery after maintenance, using its original
 destination. Delivery acceptance does not prove provider resolution.
+
+Independent webhook notification sequences can use up to four concurrent
+requests per destination by default. Other drivers default to one, with bounded
+operator overrides. Related openings and resolutions remain ordered locally;
+provider pacing and global worker limits remain stricter constraints. This does
+not combine or delay independent alerts for a digest. See
+[notification dispatch](docs/check-execution.md) for provider scopes and limits.
 
 If local preparation fails, such as an unreadable CA file, current health is
 `unknown` and monitoring is unavailable. The last real health observation and its

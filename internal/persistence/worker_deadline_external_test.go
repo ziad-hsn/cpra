@@ -8,9 +8,18 @@ import (
 )
 
 func TestWorkerNotificationBudgetBeginsAtFirstGrant(t *testing.T) {
-	s, authority, request, in, _ := workerPollFixture(t, "notification", WorkerNotificationConditionFormatVersion)
+	testWorkerBudgetAtFirstGrant(t, "notification", WorkerNotificationConditionFormatVersion)
+}
+
+func TestWorkerRecoveryBudgetBeginsAtFirstGrant(t *testing.T) {
+	testWorkerBudgetAtFirstGrant(t, "recovery", WorkerDispatchFormatVersion)
+}
+
+func testWorkerBudgetAtFirstGrant(t *testing.T, category string, format int) {
+	t.Helper()
+	s, authority, request, in, _ := workerPollFixture(t, category, format)
 	if in.ExecutionBudget <= 0 || !in.Deadline.IsZero() {
-		t.Fatal("new notification fixture did not capture a start-based budget")
+		t.Fatal("new action fixture did not capture a start-based budget")
 	}
 	if _, err := s.CommitWorkerExecution(t.Context(), in); err != nil {
 		t.Fatal(err)

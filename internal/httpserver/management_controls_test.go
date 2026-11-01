@@ -158,8 +158,10 @@ func TestManagementIgnoreRealSDKContract(t *testing.T) {
 		t.Fatal("Ignore failed", err)
 	}
 	got, err := f.sdk.Monitors.Get(t.Context(), monitor.ID)
-	if err != nil || !got.Data.Status.Ignored || got.Data.Status.Health != "unhealthy" || got.Data.Status.IgnoredBy != "operator" {
-		t.Fatal("Ignore concealed health or lost its actor", err)
+	if err != nil || !got.Data.Status.Ignored || got.Data.Status.Health != "unknown" || got.Data.Status.Availability.State != "unavailable" ||
+		got.Data.Status.LastObservedHealth != "unhealthy" || got.Data.Status.LastObservedAt == nil || !got.Data.Status.LastObservedAt.Equal(monitor.LastCheck) ||
+		got.Data.Status.IgnoredBy != "operator" {
+		t.Fatal("Ignore concealed the last observation, invented owner availability or lost its actor", err)
 	}
 	if _, err := f.sdk.Monitors.Unignore(t.Context(), monitor.ID, request); err == nil {
 		t.Fatal("stale control revision was accepted")
@@ -251,6 +253,39 @@ func TestManagementIncidentPaginationFreezesAndBindsAccess(t *testing.T) {
 	response, _ = f.request(t, http.MethodGet, path+"&monitorID=later", managementOperatorToken, nil, nil)
 	if response.StatusCode != 400 {
 		t.Fatal("cursor changed filter", response.StatusCode)
+	}
+	for _, query := range []string{"&state=closed", "&acknowledged=false", "&dismissed=true", "&order=id"} {
+		response, _ = f.request(t, http.MethodGet, path+query, managementOperatorToken, nil, nil)
+		if response.StatusCode != 400 {
+			t.Fatal("cursor changed triage query", query, response.StatusCode)
+		}
+	}
+	for _, query := range []string{"state=oops", "acknowledged=1", "dismissed=", "order=severity", "state=open&state=closed"} {
+		response, _ = f.request(t, http.MethodGet, "/api/v2/incidents?"+query, managementOperatorToken, nil, nil)
+		if response.StatusCode != 400 {
+			t.Fatal("invalid incident filter accepted", query, response.StatusCode)
+		}
+	}
+	filtered, err := f.sdk.Incidents.List(ctx, cpra.ListOptions{Limit: 1, IncidentState: "open", Acknowledged: api.Pointer(false), Dismissed: api.Pointer(false), IncidentOrder: "triage"})
+	if err != nil || len(filtered.Data.Items) != 1 || filtered.Data.NextCursor == "" {
+		t.Fatal("SDK triage filters", err)
+	}
+	continued, err := f.sdk.Incidents.List(ctx, cpra.ListOptions{Limit: 1, Cursor: filtered.Data.NextCursor, IncidentState: "open", Acknowledged: api.Pointer(false), Dismissed: api.Pointer(false), IncidentOrder: "triage"})
+	if err != nil || len(continued.Data.Items) != 1 || continued.Data.Items[0].ID == filtered.Data.Items[0].ID {
+		t.Fatal("SDK filtered continuation", err)
+	}
+	response, _ = f.request(t, http.MethodGet, "/api/v2/incidents?limit=1&cursor="+url.QueryEscape(filtered.Data.NextCursor), managementOperatorToken, nil, nil)
+	if response.StatusCode != 400 {
+		t.Fatal("removed original filter accepted", response.StatusCode)
+	}
+	response, _ = f.request(t, http.MethodGet, path+"&order=triage", managementOperatorToken, nil, nil)
+	if response.StatusCode != 200 {
+		t.Fatal("equivalent default order rejected", response.StatusCode)
+	}
+	response, body := f.request(t, http.MethodGet, "/api/v2/incidents?monitorID=one&state=closed", managementOperatorToken, nil, nil)
+	var empty api.IncidentList
+	if err := json.Unmarshal(body, &empty); err != nil || response.StatusCode != 200 || len(empty.Items) != 0 {
+		t.Fatal("exact monitor bypassed filter", response.StatusCode, err)
 	}
 	response, _ = f.request(t, http.MethodGet, "/api/v2/incidents?selector=team%3Dops", managementOperatorToken, nil, nil)
 	if response.StatusCode != 501 {

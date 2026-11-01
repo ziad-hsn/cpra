@@ -14,7 +14,7 @@ func TestNormalizeFileBaseDoesNotExpandInExternalBuild(t *testing.T) {
 	external := `{"type":"external","config":{"jobTypeID":"custom","version":"v1"}}`
 	builtInCheck := `{"driver":{"type":"http","config":{"url":"https://example.test"}},"interval":"60s","timeout":"5s"}`
 	for _, input := range []string{
-		`{"apiVersion":"cpra.io/v2","kind":"JobType","metadata":{"id":"custom"},"spec":{"kind":"check","handler":"handler","protocolVersion":"v1","version":"v1"}}`,
+		`{"apiVersion":"cpra.io/v2","kind":"JobType","metadata":{"id":"custom"},"spec":{"kind":"check","handler":"handler","protocolVersion":"1","version":"v1"}}`,
 		`{"apiVersion":"cpra.io/v2","kind":"NotificationEndpoint","metadata":{"id":"custom"},"spec":` + external + `}`,
 		`{"apiVersion":"cpra.io/v2","kind":"Monitor","metadata":{"id":"custom"},"spec":{"check":{"driver":` + external + `,"interval":"60s","timeout":"5s"}}}`,
 		`{"apiVersion":"cpra.io/v2","kind":"Monitor","metadata":{"id":"custom"},"spec":{"check":` + builtInCheck + `,"recovery":{"driver":` + external + `}}}`,

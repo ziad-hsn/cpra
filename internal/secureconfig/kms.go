@@ -109,15 +109,15 @@ func NewKMSWrapper(ctx context.Context, config aws.Config, opts KMSOptions) (*KM
 	if err != nil {
 		return nil, remoteOperationError(ctx, err)
 	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	if result == nil || result.KeyMetadata == nil {
 		return nil, ErrRemoteResponse
 	}
 	m := result.KeyMetadata
 	if aws.ToString(m.Arn) != opts.KeyARN || !m.Enabled || m.KeyState != types.KeyStateEnabled || m.KeyManager != types.KeyManagerTypeCustomer || m.KeySpec != types.KeySpecSymmetricDefault || m.KeyUsage != types.KeyUsageTypeEncryptDecrypt || !slices.Contains(m.EncryptionAlgorithms, types.EncryptionAlgorithmSpecSymmetricDefault) {
 		return nil, ErrRemoteKeyUnsupported
-	}
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
 	}
 	initialized = true
 	return w, nil
@@ -168,11 +168,11 @@ func (w *KMSWrapper) Wrap(ctx context.Context, key, aad []byte) ([]byte, error) 
 	if err != nil {
 		return nil, remoteOperationError(ctx, err)
 	}
-	if result == nil || aws.ToString(result.KeyId) != w.arn || result.EncryptionAlgorithm != types.EncryptionAlgorithmSpecSymmetricDefault || len(result.CiphertextBlob) == 0 || len(result.CiphertextBlob) > 6144 {
-		return nil, ErrRemoteResponse
-	}
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
+	}
+	if result == nil || aws.ToString(result.KeyId) != w.arn || result.EncryptionAlgorithm != types.EncryptionAlgorithmSpecSymmetricDefault || len(result.CiphertextBlob) == 0 || len(result.CiphertextBlob) > 6144 {
+		return nil, ErrRemoteResponse
 	}
 	return result.CiphertextBlob, nil
 }
@@ -201,16 +201,18 @@ func (w *KMSWrapper) Unwrap(ctx context.Context, wrapped, aad []byte) ([]byte, e
 		}
 		return nil, remoteOperationError(ctx, err)
 	}
+	if ctx.Err() != nil {
+		if result != nil {
+			clear(result.Plaintext)
+		}
+		return nil, ctx.Err()
+	}
 	if result == nil {
 		return nil, ErrRemoteResponse
 	}
 	if aws.ToString(result.KeyId) != w.arn || result.EncryptionAlgorithm != types.EncryptionAlgorithmSpecSymmetricDefault || len(result.Plaintext) != keySize {
 		clear(result.Plaintext)
 		return nil, ErrRemoteResponse
-	}
-	if ctx.Err() != nil {
-		clear(result.Plaintext)
-		return nil, ctx.Err()
 	}
 	return result.Plaintext, nil
 }

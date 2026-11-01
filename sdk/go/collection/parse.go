@@ -18,6 +18,7 @@ import (
 )
 
 func (b *builder) parseYAML(ctx context.Context, input io.Reader, source string) error {
+	b.jsonInput = false
 	scan := bufio.NewScanner(input)
 	scan.Buffer(make([]byte, 64<<10), b.o.MaxResourceBytes+1)
 	var metadata, entry bytes.Buffer
@@ -496,6 +497,7 @@ func punctuation(r byteReader, want byte) error {
 }
 
 func (b *builder) parseJSON(ctx context.Context, r byteReader, source string) error {
+	b.jsonInput = true
 	for document := 1; ; document++ {
 		first, err := peekNonspace(r)
 		if err == io.EOF {
@@ -797,6 +799,18 @@ func (b *builder) document(ctx context.Context, value any, location Location, po
 	if len(m) == 0 {
 		return fmt.Errorf("empty mapping is not a resource")
 	}
+	if b.normalizationProfile == "" && !b.allowDestinationConflict || b.normalizationProfile == FileNormalizationProfile {
+		if version, exists := m["version"]; exists {
+			// Metadata has no schema-selection meaning. Match the file loader's
+			// integer decoding, including omitted/null metadata, without changing
+			// historical profiles used to resume committed source identities.
+			raw, err := json.Marshal(version)
+			var integer int64
+			if err != nil || json.Unmarshal(raw, &integer) != nil {
+				return &SourceError{Location: locationAt(location, positions["/version"]), Field: "version", Cause: api.InvalidField("version", "invalidType")}
+			}
+		}
+	}
 	for _, entry := range []struct{ field, kind string }{{"endpoints", "NotificationEndpoint"}, {"notification_groups", "NotificationGroup"}} {
 		value, exists := m[entry.field]
 		if !exists {
@@ -839,6 +853,9 @@ func (b *builder) document(ctx context.Context, value any, location Location, po
 					if field != "type" && field != "config" {
 						return fmt.Errorf("unknown manifest endpoint field")
 					}
+				}
+				if err := b.manifestDriverFields("notification", endpoint["type"], endpoint["config"]); err != nil {
+					return (Item{Location: location, FieldPositions: resourceFieldPositions(fields, false)}).ValidationError(api.PrefixValidationError("spec", err))
 				}
 				driver, err := driverFromManifest("notification", endpoint["type"], endpoint["config"])
 				if err != nil {
@@ -889,6 +906,9 @@ func (b *builder) emitResource(value any, location Location, manifest bool, posi
 	var resource api.Resource
 	var err error
 	if manifest {
+		if err := b.monitorDriverFields(m); err != nil {
+			return (Item{Location: location, FieldPositions: fields}).ValidationError(err)
+		}
 		resource, err = monitorFromManifestProfile(m, b.normalizationProfile == fileNormalizationV1 || b.allowDestinationConflict)
 	} else {
 		for key := range m {
@@ -1010,25 +1030,14 @@ func monitorFromManifestProfile(m map[string]any, allowDestinationConflict bool)
 		if !ok {
 			return api.Resource{}, api.InvalidField("spec.recovery", "objectRequired")
 		}
-		recovery := make(map[string]any)
-		for key, value := range object {
-			switch key {
-			case "action", "target":
-			case "retries":
-				recovery[key] = value
-			case "max_attempts":
-				recovery["maxAttempts"] = value
-			case "max_failures":
-				recovery["maxFailures"] = value
-			default:
-				return api.Resource{}, api.InvalidField("spec.recovery", "unknownField")
-			}
-		}
-		driver, err := driverFromManifest("recovery", object["action"], object["target"])
+		raw, err := json.Marshal(object)
 		if err != nil {
-			return api.Resource{}, api.PrefixValidationError("spec.recovery.driver", err)
+			return api.Resource{}, api.InvalidField("spec.recovery", "invalidJSON")
 		}
-		recovery["driver"] = driver
+		recovery, err := api.NormalizeManifestRecovery(raw)
+		if err != nil {
+			return api.Resource{}, api.PrefixValidationError("spec.recovery", err)
+		}
 		spec["recovery"] = recovery
 	}
 	if codes, exists := m["codes"]; exists {
@@ -1104,14 +1113,14 @@ func isPositiveInteger(value any) bool {
 func driverFromManifest(category string, kindValue, config any) (api.DriverConfig, error) {
 	kind, ok := kindValue.(string)
 	if !ok || kind == "" {
-		return api.DriverConfig{}, fmt.Errorf("manifest driver type is required")
+		return api.DriverConfig{}, api.InvalidField("type", "required")
 	}
 	if _, ok := config.(map[string]any); !ok {
-		return api.DriverConfig{}, fmt.Errorf("manifest driver config must be an object")
+		return api.DriverConfig{}, api.InvalidField("config", "objectRequired")
 	}
 	raw, err := json.Marshal(config)
 	if err != nil {
-		return api.DriverConfig{}, fmt.Errorf("invalid manifest driver config")
+		return api.DriverConfig{}, api.InvalidField("config", "invalidType")
 	}
 	normalized, err := api.NormalizeManifestDriver(category, kind, raw)
 	if err != nil {

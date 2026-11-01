@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ziad-hsn/cpra/internal/management"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
@@ -132,15 +133,23 @@ func (m *managementHTTP) logControlTransitions(result management.ControlResult) 
 			message = "Monitor entered Ignore"
 		case "monitor_unignored":
 			message = "Monitor left Ignore"
+		case "control_snooze":
+			message = "Monitor snoozed"
+		case "control_unsnooze":
+			message = "Monitor snooze cleared"
 		default:
 			continue
 		}
 		// General logs contain validated identities and a fixed cause. The
 		// operator's free-form reason remains in authenticated audit history.
-		m.logInfo(message, "event_type", event.Type, "monitor_id", event.MonitorID,
+		fields := []any{"event_type", event.Type, "monitor_id", event.MonitorID,
 			"monitor_uid", event.CatalogUID, "incident_id", event.IncidentID,
 			"control_revision", event.ControlRevision, "operation_id", result.Operation.ID,
-			"actor", event.Actor, "ignore_cause", "operator", "observed_at", event.At.UTC().Format(time.RFC3339Nano))
+			"actor", event.Actor, "observed_at", event.At.UTC().Format(time.RFC3339Nano)}
+		if event.Type == "monitor_ignored" || event.Type == "monitor_unignored" {
+			fields = append(fields, "ignore_cause", "operator")
+		}
+		m.logInfo(message, fields...)
 	}
 }
 
@@ -163,7 +172,7 @@ func (m *managementHTTP) handleIncidents(w http.ResponseWriter, r *http.Request)
 			if err != nil {
 				return err
 			}
-			entry.incidents = view
+			entry.incidents = view.WithFilter(incidentFilter(query))
 		}
 		items, after, err := entry.incidents.Page(ctx, entry.monitorID, read.cursor.After, entry.limit)
 		if err != nil {
@@ -197,7 +206,7 @@ func incidentListQuery(r *http.Request) (url.Values, error) {
 			return nil, managementFailure(400, "invalidQuery", "Duplicate query parameters are not accepted.")
 		}
 		switch key {
-		case "cursor", "limit", "monitorID":
+		case "cursor", "limit", "monitorID", "state", "acknowledged", "dismissed", "order":
 		case "selector":
 			if values[0] != "" {
 				return nil, managementFailure(501, "featureUnavailable", "Incident label filtering is not enabled. Use monitorID for exact monitor selection.")
@@ -206,5 +215,28 @@ func incidentListQuery(r *http.Request) (url.Values, error) {
 			return nil, managementFailure(400, "invalidQuery", "The query contains an unsupported parameter.")
 		}
 	}
+	if !incidentFilter(query).Valid() {
+		return nil, managementFailure(400, "invalidQuery", "Use an incident state, true/false attention filters, and triage or id ordering.")
+	}
+	for _, key := range []string{"state", "acknowledged", "dismissed", "order"} {
+		if query.Has(key) && query.Get(key) == "" {
+			return nil, managementFailure(400, "invalidQuery", "Incident filters must have explicit values.")
+		}
+	}
 	return query, nil
+}
+
+func incidentFilter(query url.Values) persistence.IncidentFilter {
+	order := query.Get("order")
+	if order == "" {
+		order = "triage"
+	}
+	return persistence.IncidentFilter{State: query.Get("state"), Acknowledged: query.Get("acknowledged"), Dismissed: query.Get("dismissed"), Order: order}
+}
+func incidentQueryIdentity(kind string, query url.Values) string {
+	if kind != "Incident" {
+		return ""
+	}
+	f := incidentFilter(query)
+	return url.Values{"state": {f.State}, "acknowledged": {f.Acknowledged}, "dismissed": {f.Dismissed}, "order": {f.Order}}.Encode()
 }

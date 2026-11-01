@@ -1,9 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { onlineManager } from '@tanstack/react-query';
 import { RouteFailure } from '../src/App';
 import { StatusChip } from '../src/components/StatusChip';
+import { PageBoundary } from '../src/components/PageBoundary';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); onlineManager.setOnline(true); });
 
@@ -34,4 +36,29 @@ it('keeps individual monitor statuses readable without a live announcement per r
   render(<><StatusChip status="up" /><StatusChip status="down" /></>);
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
   expect(document.body).toHaveTextContent('OPERATIONAL');
+});
+
+it('retains a successful operation receipt during healthy route navigation', () => {
+  function SavedOperation() {
+    const [receipt, setReceipt] = useState('');
+    return <><button onClick={() => setReceipt('operation-123')}>Save fixture</button><output>{receipt}</output></>;
+  }
+  const view = render(<PageBoundary resetKey="/secrets" fallback={<p>Unavailable</p>}><SavedOperation /></PageBoundary>);
+  fireEvent.click(screen.getByRole('button', {name: 'Save fixture'}));
+  view.rerender(<PageBoundary resetKey="/secrets/created" fallback={<p>Unavailable</p>}><SavedOperation /></PageBoundary>);
+  expect(screen.getByRole('status')).toHaveTextContent('operation-123');
+});
+
+it('allows navigation away from a failed page without rendering its error', () => {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  const expectedFailure = (event: ErrorEvent) => { if (event.message.includes('private-route-marker')) event.preventDefault(); };
+  window.addEventListener('error', expectedFailure);
+  function Broken(): never { throw new Error('private-route-marker'); }
+  const view = render(<PageBoundary resetKey="/failed" fallback={<p>Page unavailable</p>}><Broken /></PageBoundary>);
+  expect(screen.getByText('Page unavailable')).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent('private-route-marker');
+  view.rerender(<PageBoundary resetKey="/next" fallback={<p>Page unavailable</p>}><p>Next page</p></PageBoundary>);
+  expect(screen.getByText('Next page')).toBeInTheDocument();
+  expect(screen.queryByText('Page unavailable')).not.toBeInTheDocument();
+  window.removeEventListener('error', expectedFailure);
 });

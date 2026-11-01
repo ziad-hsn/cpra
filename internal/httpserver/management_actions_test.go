@@ -195,7 +195,11 @@ func TestManagementRecoveryIsGuardedIntentWithPendingReceipt(t *testing.T) {
 		t.Fatal("automatic fixture unexpectedly queued recovery")
 	}
 	current, err := f.sdk.Monitors.Get(ctx, m.ID)
-	if err != nil || current.Data.Status.ControlRevision == "" || current.Data.Status.Health != "unhealthy" {
+	// This fixture commits observations without installing a controller owner.
+	// The prior failure remains visible but cannot establish current availability.
+	if err != nil || current.Data.Status.ControlRevision == "" || current.Data.Status.Health != "unknown" ||
+		current.Data.Status.Availability.State != "unavailable" || current.Data.Status.LastObservedHealth != "unhealthy" ||
+		current.Data.Status.LastObservedAt == nil || !current.Data.Status.LastObservedAt.Equal(m.LastCheck) {
 		t.Fatalf("status: %+v %v", current, err)
 	}
 	invalidBody, _ := json.Marshal(api.ControlRequest{Revision: m.ControlRevision})

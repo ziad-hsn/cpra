@@ -182,7 +182,7 @@ func TestWorkerEvidenceSnapshotIsFrozenAndRejectsCorruption(t *testing.T) {
 	if err := snap.Persist(sink); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(sink.Bytes(), []byte(actionWorkerSnapshotMagic)) {
+	if !bytes.HasPrefix(sink.Bytes(), []byte(workerDispatchSnapshotMagic)) {
 		t.Fatal("snapshot does not preserve the delivery worker format")
 	}
 	if bytes.Contains(sink.Bytes(), []byte("private-worker-result-canary")) {
@@ -242,7 +242,7 @@ func TestWorkerEvidenceSnapshotIsFrozenAndRejectsCorruption(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{c}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion || version == WorkerNotificationConditionFormatVersion || version == WorkerRecoveryRulesFormatVersion || version == WorkerDispatchFormatVersion) {
 			t.Fatal("evidence format", version, err)
 		}
 	}

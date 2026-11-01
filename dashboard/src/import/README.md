@@ -35,11 +35,14 @@ try {
 
 The shared parser supplies the existing Go behavior for multi-document YAML/JSON,
 resource arrays and Lists, legacy manifests and driver normalization, duplicate
-keys and identities, and source document/item positions. The current `cpra.file.base.v2`
-profile supports aliases and merge keys within one parsed entry, with cycle, depth,
-expanded-node and expanded-byte limits. Cross-entry anchors are not supported.
-The original v1 normalization remains available only to verify and continue an
-existing operation; new browser imports use v2.
+keys and identities, and source document/item positions. The current `cpra.file.base.v5`
+profile supports aliases and merge keys referencing earlier anchors in the same
+document, including across entries, with cycle, depth, expanded-node and
+expanded-byte limits. Forward references and cross-document anchors are rejected.
+Historical v1–v4 normalization remains available only to verify and continue an
+existing operation; new browser imports use v5. Profile v5 validates original driver
+field spellings and metadata types before normalization; historical profiles retain
+their exact byte identities.
 JavaScript does not reconstruct numeric resource values. JSON numeric tokens
 retain their exact spelling. YAML decimal spellings normalize textually without
 rounding. Fractional or exponent notation for integer controls is rejected just

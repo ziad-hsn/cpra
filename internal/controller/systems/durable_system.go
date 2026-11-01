@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mlange-42/ark/ecs"
 	"github.com/ziad-hsn/cpra/internal/controller/components"
+	"github.com/ziad-hsn/cpra/internal/controller/entities"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/management"
@@ -83,6 +84,7 @@ type DurableSystem struct {
 	recoveryBypass         bool
 	stopping               atomic.Bool
 	recovering             atomic.Bool
+	lastAdmissionProgress  atomic.Int64
 	nextRecovery           time.Time
 	pendingWrite           *ownerWrite
 	resultBacklog          []jobs.Result
@@ -111,6 +113,11 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 		m := q.Get()
 		if stored := s.jobs.Get(q.Entity()); stored != nil && s.agentSealer == nil {
 			_, requiresKey := jobs.A2AConnection(stored.InterventionJob)
+			if config := s.interventions.Get(q.Entity()); config != nil {
+				for _, rule := range config.Choices {
+					requiresKey = requiresKey || rule.Action == "a2a"
+				}
+			}
 			for _, group := range stored.CodeJobs {
 				for _, job := range group {
 					_, agent := jobs.A2AConnection(job)
@@ -158,19 +165,22 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 		state := q.Get()
 		cfg := s.configs.Get(ent)
 		js := s.jobs.Get(ent)
-		policy := persistence.Policy{Interval: cfg.Interval, Unhealthy: cfg.UnhealthyThreshold, Healthy: cfg.HealthyThreshold, Enabled: s.disabled.Get(ent) == nil, Intervention: s.interventions.Get(ent) != nil, Cooldown: s.cooldown, RecoveryBypass: s.recoveryBypass, Endpoints: map[string]int{}}
+		policy := persistence.Policy{NotificationBindings: map[string][]string{}, Interval: cfg.Interval, Unhealthy: cfg.UnhealthyThreshold, Healthy: cfg.HealthyThreshold, Enabled: s.disabled.Get(ent) == nil, Intervention: s.interventions.Get(ent) != nil, Cooldown: s.cooldown, RecoveryBypass: s.recoveryBypass, Endpoints: map[string]int{}}
 		if ignore := ecs.NewMap1[components.AutoIgnore](s.world).Get(ent); ignore != nil {
 			policy.AutoIgnore = &persistence.AutoIgnorePolicy{Incidents: ignore.Incidents, Window: ignore.Window}
 		}
 		recoveryDriver := ""
 		if recovery := s.interventions.Get(ent); recovery != nil {
 			recoveryDriver = recovery.Action
+			policy.RecoveryRules = recovery.Rules
 			policy.RecoveryMaxAttempts = recovery.MaxAttempts
-			var err error
-			policy.RecoveryTimeout, err = jobs.InterventionBudget(recovery.Target)
-			if err != nil {
-				q.Close()
-				return err
+			if recovery.Rules.IsZero() {
+				var err error
+				policy.RecoveryTimeout, err = jobs.InterventionBudget(recovery.Target)
+				if err != nil {
+					q.Close()
+					return err
+				}
 			}
 		}
 		if policy.Healthy <= 0 {
@@ -197,6 +207,12 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 							policy.NotificationEndpointIDs = make(map[string][]string)
 						}
 						policy.NotificationEndpointIDs[color] = slices.Clone(c.EndpointIDs)
+						for ordinal, endpoint := range c.EndpointIDs {
+							if ordinal < len(c.EndpointBindings) {
+								endpoint = c.EndpointBindings[ordinal]
+							}
+							policy.NotificationBindings[color] = append(policy.NotificationBindings[color], persistence.NotificationBinding(cfg.TargetBinding, endpoint, ""))
+						}
 					}
 					setRecoveryNotification(&policy, color, c.Trigger, recoveryDriver)
 				}
@@ -229,6 +245,10 @@ func (s *DurableSystem) Load(ctx context.Context) error {
 }
 
 func (s *DurableSystem) Initialize(*ecs.World) {
+	if err := s.restoreNotificationRates(context.Background()); err != nil {
+		s.fail(err)
+		return
+	}
 	now := time.Now()
 	view, err := s.store.ControlSnapshot()
 	if err != nil {
@@ -277,6 +297,7 @@ func (s *DurableSystem) Initialize(*ecs.World) {
 	}
 	s.startWorkerDispatch()
 	s.ownerInitialized = true
+	s.lastAdmissionProgress.Store(time.Now().UnixNano())
 }
 
 // PulseArrivalRate returns scheduled local-worker demand in checks/second.
@@ -354,6 +375,14 @@ func (s *DurableSystem) resetCheckSchedule(ent ecs.Entity) {
 
 // AdmissionReady is safe for readiness readers outside the owner loop.
 func (s *DurableSystem) AdmissionReady() bool { return !s.stopping.Load() && !s.recovering.Load() }
+
+// Progressing checks successful owner admission work, not just loop wakeups.
+// A health-read timeout does not become an uncertain write, but sustained
+// contention must stop stale observations from appearing current.
+func (s *DurableSystem) Progressing() bool {
+	at := s.lastAdmissionProgress.Load()
+	return s.AdmissionReady() && at != 0 && time.Since(time.Unix(0, at)) < 30*time.Second
+}
 
 func (s *DurableSystem) StopAdmission() {
 	s.stopping.Store(true)
@@ -488,6 +517,9 @@ func (s *DurableSystem) Update(*ecs.World) {
 		s.recovering.Store(false)
 	}
 	s.dispatchReady(now)
+	if s.pendingWrite == nil && s.lastError == nil && s.AdmissionReady() {
+		s.lastAdmissionProgress.Store(time.Now().UnixNano())
+	}
 }
 
 func (s *DurableSystem) fail(err error) {
@@ -568,7 +600,10 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 	needsCompletion := false
 	for _, r := range batch {
 		if r.FinalizationErr != nil {
-			if !persistence.IsLeadershipUnavailable(r.FinalizationErr) {
+			if !persistence.IsLeadershipUnavailable(r.FinalizationErr) &&
+				!errors.Is(r.FinalizationErr, persistence.ErrCommitUnconfirmed) &&
+				!errors.Is(r.FinalizationErr, context.DeadlineExceeded) &&
+				!errors.Is(r.FinalizationErr, context.Canceled) {
 				s.fail(r.FinalizationErr)
 				return false
 			}
@@ -594,6 +629,10 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 	uids := make([]string, 0, len(batch))
 	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
+	if err := s.recordNotificationFeedback(ctx, batch); err != nil {
+		s.recoveryError(err, ctx)
+		return false
+	}
 	now := time.Now()
 	for _, r := range batch {
 		if r.Type == "pulse" && r.ExecutionStart.IsZero() && (persistence.IsLeadershipUnavailable(r.Err) || errors.Is(r.Err, errAdmissionRecovering) || errors.Is(r.Err, context.Canceled) || errors.Is(r.Err, context.DeadlineExceeded)) {
@@ -648,7 +687,7 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 			continue
 		}
 		state := s.states.Get(ent)
-		if state.Revision != r.Revision {
+		if state.Revision != r.Revision && (r.Type == "pulse" || !found || !current.ActionConfigurationCurrent(current.Actions[r.ActionID])) {
 			s.releaseResult(r)
 			continue
 		}
@@ -680,6 +719,12 @@ func (s *DurableSystem) commitResults(batch []jobs.Result) bool {
 		c.Failure = c.Failure.WithDetails()
 		if r.Type == "pulse" && jobs.ConfigurationFailure(r.Err) != "" {
 			c.Outcome, c.Warning = "configuration_problem", false
+		}
+		if r.Type == "pulse" && r.Err != nil {
+			c.Failure = persistence.CheckFailure(jobs.ClassifyCheckFailure(s.configs.Get(ent).Type, r.Err, r.ExecutionEnd))
+			if c.Failure.MonitoringUnavailable() {
+				c.Outcome, c.Warning = "configuration_problem", false
+			}
 		}
 		if r.Type == "pulse" && managed {
 			guard := projection.guard.Clone()
@@ -753,6 +798,18 @@ func (s *DurableSystem) finishResultWrite(ctx context.Context, p *ownerWrite) er
 				return err
 			}
 		}
+		retained := false
+		projection := r.Monitor
+		if projection == nil && found {
+			projection = &current
+		}
+		if projection != nil && projection.Revision != job.Revision && job.Type != "pulse" && job.ActionID != "" {
+			a, ok, err := s.store.ActionContext(ctx, job.ActionID)
+			if err != nil {
+				return err
+			}
+			retained = ok && a.MonitorID == job.MonitorID && a.Revision == job.Revision && projection.OwnsAction(a.Action) && projection.ActionConfigurationCurrent(a.Action)
+		}
 		// Everything below is local owner work. Advance this item's cursor once;
 		// a later contextual read cannot cause its SLO observation to run again.
 		s.releaseResult(job)
@@ -775,7 +832,7 @@ func (s *DurableSystem) finishResultWrite(ctx context.Context, p *ownerWrite) er
 			// A worker may defer before the started marker (for example when
 			// a maintenance window begins while it waits in the queue).
 			if job.Type != "pulse" {
-				if m := current; found && m.CatalogUID == p.monitorUIDs[n] && m.Revision == job.Revision && !m.Removed {
+				if m := current; found && m.CatalogUID == p.monitorUIDs[n] && (m.Revision == job.Revision || retained) && !m.Removed {
 					if ent, exists := s.entities[job.MonitorID]; exists && s.world.Alive(ent) && s.states.Get(ent).Revision == m.Revision {
 						s.project(ent, m)
 						s.scheduleActions(ent, m)
@@ -789,7 +846,7 @@ func (s *DurableSystem) finishResultWrite(ctx context.Context, p *ownerWrite) er
 		}
 		ent, exists := s.entities[job.MonitorID]
 		m := *r.Monitor
-		if m.CatalogUID != p.monitorUIDs[n] || m.Revision != job.Revision {
+		if m.CatalogUID != p.monitorUIDs[n] || m.Revision != job.Revision && !retained {
 			continue
 		}
 		if job.Type == "pulse" {
@@ -1031,7 +1088,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 		encoded, remainingCancellation := 64, false
 		for _, id := range sortedMonitorActions(m) {
 			a := m.Actions[id]
-			if a.State != persistence.Queued || !m.OwnsAction(a) || a.Revision != state.Revision {
+			if a.State != persistence.Queued || !m.OwnsAction(a) || !m.ActionConfigurationCurrent(a) {
 				continue
 			}
 			expired := !a.Deadline.IsZero() && !now.Before(a.Deadline)
@@ -1040,7 +1097,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			if !expired && !suppressed {
 				continue
 			}
-			command := persistence.Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: id, At: now, Maintenance: suppressed, NoticeRevision: persistence.ActionNoticeRevision(a)}
+			command := persistence.Command{Kind: "start", MonitorID: m.ID, Revision: a.Revision, ActionID: id, At: now, Maintenance: suppressed, NoticeRevision: persistence.ActionNoticeRevision(a)}
 			if projection, ok := s.managed[m.ID]; ok {
 				g := projection.guard.Clone()
 				command.Guard = &g
@@ -1082,6 +1139,9 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 					m = *result.Monitor
 				}
 			}
+			for _, result := range results {
+				s.logLifecycleEvents(result.Events, result.Monitor)
+			}
 			s.project(ent, m)
 			if s.index != nil {
 				s.index.Put(s.summary(ent, m))
@@ -1097,7 +1157,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				return
 			}
 			a := m.Actions[id]
-			if a.State != persistence.Queued || !m.OwnsAction(a) || a.Revision != state.Revision || s.admitted[id] || a.NotBefore.After(now) {
+			if a.State != persistence.Queued || !m.OwnsAction(a) || !m.ActionConfigurationCurrent(a) || s.admitted[id] || a.NotBefore.After(now) {
 				continue
 			}
 			if !m.ControlNotification(a) && (!m.Policy.Enabled || m.Ignored || maintenance) {
@@ -1111,17 +1171,41 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 				continue // A fresh observation reschedules eligible work.
 			}
 			js := s.jobs.Get(ent)
-			if s.dispatchWorkerAction(ent, a) {
+			preparationProblem := interventionPreparationProblem(js, m)
+			if a.Kind == "intervention" && a.Rule != (persistence.RecoverySelection{}) && js.InterventionRuleBinding != a.Rule.Target.Binding {
+				if preparationProblem && js.InterventionPreparationAction == a.ID && now.Before(js.InterventionPreparationRetry) {
+					s.scheduleActionAt(ent, js.InterventionPreparationRetry)
+					continue
+				}
+				job, flow, err := entities.PrepareRuleJob(s.interventions.Get(ent), a.Rule, ent)
+				if err != nil {
+					if js.InterventionPreparationAction != a.ID && s.logger != nil {
+						s.logger.Error("Selected intervention could not be prepared; checks continue", "monitor_id", m.ID, "action_id", a.ID, "rule_id", a.Rule.RuleID, "reason", "preparation_unavailable")
+					}
+					js.InterventionPreparationAction = a.ID
+					js.InterventionPreparationRetry = now.Add(max(m.Policy.Interval, time.Second))
+					s.scheduleActionAt(ent, js.InterventionPreparationRetry)
+					if s.index != nil {
+						s.index.Put(s.summary(ent, m))
+					}
+					continue
+				}
+				js.InterventionPreparationAction = ""
+				js.InterventionPreparationRetry = time.Time{}
+				js.InterventionJob, js.InterventionFlow, js.InterventionRuleBinding = job, flow, a.Rule.Target.Binding
+			}
+			endpoint := m.ActionEndpoint(a)
+			if s.dispatchWorkerAction(ent, a, endpoint) {
 				continue
 			}
 			prototype := js.InterventionJob
 			if a.Kind == "code" {
 				list := js.CodeJobs[a.Color]
-				if a.Endpoint < 0 || a.Endpoint >= len(list) {
+				if endpoint < 0 || endpoint >= len(list) {
 					s.fail(fmt.Errorf("configured endpoint missing for committed action"))
 					return
 				}
-				prototype = list[a.Endpoint]
+				prototype = list[endpoint]
 			}
 			if isNilJob(prototype) {
 				s.fail(fmt.Errorf("configured job missing for committed action"))
@@ -1130,11 +1214,20 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 			d := jobs.NewDispatch(prototype, ent, a.Kind, a.Color, 0, a.Endpoint)
 			flow := js.InterventionFlow
 			if a.Kind == "code" {
-				if flows := js.CodeFlows[a.Color]; a.Endpoint >= 0 && a.Endpoint < len(flows) {
-					flow = flows[a.Endpoint]
+				if flows := js.CodeFlows[a.Color]; endpoint >= 0 && endpoint < len(flows) {
+					flow = flows[endpoint]
 				}
 			}
 			d.Driver, d.FlowKey = flow.Driver, flow.Key
+			d.FenceResult = a.Kind == "code"
+			pacing := s.config.Notifications.Pacing[d.Driver]
+			d.ConfigureNotificationPacing(flow.Digest, pacing.MinimumInterval, pacing.SharedScope)
+			if a.NotificationPermit != nil {
+				d.RateScopes = nil
+				for _, scope := range a.NotificationPermit.Scopes {
+					d.RateScopes = append(d.RateScopes, jobs.NotificationRateScope{ID: scope.ID, Interval: scope.Interval, Global: scope.Global, Serial: scope.Serial})
+				}
+			}
 			destination := destination{a.Kind, flow.Driver, flow.Key}
 			if denied[destination] {
 				continue // Preserve order when an earlier delivery could not enter this queue.
@@ -1212,7 +1305,7 @@ func (s *DurableSystem) dispatchActions(now time.Time) {
 						return jobs.ActionExecution{}, err
 					}
 				}
-				handle, err := s.store.BeginLocalAction(ctx, persistence.Command{Kind: "start", MonitorID: monitorID, Revision: revision, ActionID: actionID, Driver: driver, At: at, Guard: guard, AgentConnection: connection, ActionDeadline: d.Deadline, Maintenance: inMaintenance, NoticeRevision: persistence.ActionNoticeRevision(originalAction.Action)})
+				handle, err := s.store.BeginLocalAction(ctx, persistence.Command{Kind: "start", MonitorID: monitorID, Revision: revision, ActionID: actionID, Driver: driver, At: at, Guard: guard, AgentConnection: connection, ActionDeadline: d.Deadline, Maintenance: inMaintenance, NoticeRevision: persistence.ActionNoticeRevision(originalAction.Action), NotificationPermit: notificationPermit(d.RateScopes)})
 				if handle == nil {
 					return jobs.ActionExecution{}, err
 				}
@@ -1257,13 +1350,15 @@ func (s *DurableSystem) logLifecycleEvents(events []persistence.Event, monitor *
 		case "incident_closed", "incident_closed_configuration_removed":
 			message = "Incident closed"
 		case "monitor_configuration_problem":
-			message, warning = "Check configuration could not be prepared", true
+			message, warning = "Monitoring is unavailable; no target observation was made", true
 		case "monitor_configuration_ready":
-			message = "Check configuration is usable again"
+			message = "Monitoring can produce target observations again"
 		case "monitor_ignored":
 			message = "Monitor entered Ignore"
 		case "monitor_unignored":
 			message = "Monitor left Ignore"
+		case "control_expire_snooze":
+			message = "Monitor snooze expired"
 		case "action_succeeded", "action_failed", "action_unknown", "action_cancelled":
 			message = "Action outcome committed"
 			warning = event.Type == "action_failed" || event.Type == "action_unknown"
@@ -1275,8 +1370,8 @@ func (s *DurableSystem) logLifecycleEvents(events []persistence.Event, monitor *
 		// inputs. History remains authoritative when diagnostic logs are sampled.
 		fields := []interface{}{"event_type", event.Type, "monitor_id", event.MonitorID,
 			"monitor_uid", event.CatalogUID, "incident_id", event.IncidentID}
-		if event.Type == "monitor_ignored" || event.Type == "monitor_unignored" {
-			fields = append(fields, "actor", event.Actor, "observed_at", event.At.UTC().Format(time.RFC3339Nano))
+		if event.Type == "monitor_ignored" || event.Type == "monitor_unignored" || event.Type == "control_expire_snooze" {
+			fields = append(fields, "actor", event.Actor, "observed_at", event.At.UTC().Format(time.RFC3339Nano), "control_revision", event.ControlRevision)
 		}
 		// Use the committed record, not a possibly newer ECS display name. An
 		// old action can share its execution revision with a replacement monitor.
@@ -1303,7 +1398,7 @@ func (s *DurableSystem) logLifecycleEvents(events []persistence.Event, monitor *
 				if cause != "operator" && cause != "incident_frequency" && cause != "verified_recovery" {
 					cause = "unavailable"
 				}
-				fields = append(fields, "ignore_cause", cause, "ignore_incident_count", len(monitor.IgnoreIncidents), "control_revision", event.ControlRevision)
+				fields = append(fields, "ignore_cause", cause, "ignore_incident_count", len(monitor.IgnoreIncidents))
 			}
 		}
 		if event.ActionID != "" {
@@ -1343,6 +1438,16 @@ func sortedMonitorActions(m persistence.Monitor) []string {
 }
 
 func (s *DurableSystem) project(ent ecs.Entity, m persistence.Monitor) {
+	if len(s.admitted) != 0 {
+		if q, ok := s.queues["code"].(interface {
+			CancelPending(string, func(string) bool)
+		}); ok {
+			q.CancelPending(m.ID, func(id string) bool {
+				a, found := m.Actions[id]
+				return found && a.State == persistence.Queued && m.OwnsAction(a) && m.ActionConfigurationCurrent(a)
+			})
+		}
+	}
 	s.projectControls(ent, m)
 	state := s.states.Get(ent)
 	state.PulseGeneration = m.Generation
@@ -1444,11 +1549,17 @@ func (s *DurableSystem) summaryAt(ent ecs.Entity, m persistence.Monitor, at time
 	} else if m.Incident || !m.IncidentConfirmedAt.IsZero() && m.IncidentClosedAt.IsZero() {
 		summary.Phase = "incident"
 	}
+	summary.RecoveryDecision = m.RuleObservation(at)
+	summary.RecoveryAdmission = m.RecoveryAdmissionObservation(at)
+	if interventionPreparationProblem(s.jobs.Get(ent), m) && summary.RecoveryAdmission != nil {
+		summary.RecoveryAdmission.Reason = "preparation_unavailable"
+	}
 	summary.LastFailure = fleetview.FailureDiagnostic(m.LastFailure)
 	summary.ConfigurationProblem = fleetview.FailureDiagnostic(m.ConfigurationProblem)
 	summary.ConfigurationProblemAt = m.ConfigurationProblemAt
 	s.projectAvailability(ent, m, at, &summary)
 	counts := m.RetainedNotifications()
+	summary.CancelledNotifications = int(counts.Cancelled)
 	summary.PendingNotifications, summary.CompletedNotifications, summary.FailedNotifications, summary.UnknownNotifications = int(counts.Pending), int(counts.Accepted), int(counts.Failed), int(counts.Unknown)
 	s.checkAdmission(ent, &summary)
 	return summary

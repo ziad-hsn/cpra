@@ -14,7 +14,7 @@ func newHealthCommand(o *options) *cobra.Command {
 		defer c.CloseIdleConnections()
 		r, err := c.Live(cmd.Context())
 		if err != nil {
-			return fmt.Errorf("server unhealthy: %w", managementFailure(err))
+			return fmt.Errorf("liveness query failed: %w", managementFailure(err))
 		}
 		if !r.Data.Available {
 			return fmt.Errorf("server unhealthy: liveness was not confirmed")
@@ -32,7 +32,7 @@ func newReadyCommand(o *options) *cobra.Command {
 		defer c.CloseIdleConnections()
 		r, err := c.Ready(cmd.Context())
 		if err != nil {
-			return fmt.Errorf("server not ready: %w", managementFailure(err))
+			return fmt.Errorf("readiness query failed: %w", managementFailure(err))
 		}
 		if !r.Data.Available {
 			return fmt.Errorf("server not ready: readiness was not confirmed")

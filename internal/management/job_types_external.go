@@ -46,7 +46,7 @@ func compileJobType(ctx context.Context, resource api.JobType) (compiledJobType,
 		return result, err
 	}
 	if resource.APIVersion != api.APIVersion || resource.Kind != "JobType" || !jobTypeName(resource.Metadata.ID) ||
-		!jobTypeName(resource.Spec.Version) || !jobTypeName(resource.Spec.Handler) || resource.Spec.ProtocolVersion != "1" {
+		!jobTypeName(resource.Spec.Version) || !jobTypeName(resource.Spec.Handler) || api.ValidateJobTypeFailures(resource.Spec) != nil {
 		return result, ErrValidation
 	}
 	if len(resource.Metadata.UID) > 256 || len(resource.Metadata.ResourceVersion) > 256 || resource.Metadata.Generation < 0 || len(resource.Spec.Timeout) > 64 {
@@ -152,7 +152,7 @@ func (c *Catalog) openJobType(ctx context.Context, value persistence.JobTypeVers
 	}
 	r := value.Record
 	if r.Key.Kind != "JobType" || resource.Metadata.ID != r.Key.ID || resource.Metadata.UID != r.UID || resource.Metadata.ResourceVersion != r.Revision || resource.Metadata.Generation != int64(r.Generation) ||
-		resource.Spec.Version != value.Version || resource.Spec.Kind != value.Category || resource.Spec.Handler != value.Handler || resource.Spec.ProtocolVersion != value.ProtocolVersion || value.SchemaProfile != jobSchemaProfile {
+		resource.Spec.Version != value.Version || resource.Spec.Kind != value.Category || resource.Spec.Handler != value.Handler || resource.Spec.ProtocolVersion != value.ProtocolVersion || value.SchemaProfile != jobSchemaProfile || !reflect.DeepEqual(resource.Spec.FailureCodes, value.FailureCodes) {
 		c.fail()
 		return api.JobType{}, ErrUnavailable
 	}
@@ -160,7 +160,7 @@ func (c *Catalog) openJobType(ctx context.Context, value persistence.JobTypeVers
 }
 
 func jobTypeSpecsEqual(ctx context.Context, a, b api.JobTypeSpec) (bool, error) {
-	if a.Version != b.Version || a.Kind != b.Kind || a.Handler != b.Handler || a.ProtocolVersion != b.ProtocolVersion || a.Timeout != b.Timeout || !reflect.DeepEqual(a.RejectionCodes, b.RejectionCodes) {
+	if a.Version != b.Version || a.Kind != b.Kind || a.Handler != b.Handler || a.ProtocolVersion != b.ProtocolVersion || a.Timeout != b.Timeout || !reflect.DeepEqual(a.RejectionCodes, b.RejectionCodes) || !reflect.DeepEqual(a.FailureCodes, b.FailureCodes) {
 		return false, nil
 	}
 	budget := &jobSchemaBudget{ctx: ctx}
@@ -286,7 +286,7 @@ func (c *Catalog) PrepareJobType(ctx context.Context, input api.JobType, expecte
 	if err := c.checkJobTypeAuthority(ctx, authority); err != nil {
 		return nil, err
 	}
-	command.Value = persistence.JobTypeVersion{Record: record, Version: resource.Spec.Version, Category: resource.Spec.Kind, Handler: resource.Spec.Handler, ProtocolVersion: resource.Spec.ProtocolVersion, SchemaProfile: jobSchemaProfile}
+	command.Value = persistence.JobTypeVersion{Record: record, Version: resource.Spec.Version, Category: resource.Spec.Kind, Handler: resource.Spec.Handler, ProtocolVersion: resource.Spec.ProtocolVersion, FailureCodes: append([]string(nil), resource.Spec.FailureCodes...), SchemaProfile: jobSchemaProfile}
 	return &PreparedJobType{catalog: c, command: command, resource: resource, used: &atomic.Bool{}, operationID: &atomic.Pointer[string]{}}, nil
 }
 

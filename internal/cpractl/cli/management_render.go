@@ -221,6 +221,9 @@ func describeMonitor(cmd *cobra.Command, resource api.Resource, name string) err
 	recovery := "not configured"
 	if spec.Recovery != nil {
 		recovery = managementDisplay(spec.Recovery.Driver.Type)
+		if len(spec.Recovery.Rules) != 0 {
+			recovery = fmt.Sprintf("ordered rules (%d), default no intervention", len(spec.Recovery.Rules))
+		}
 	}
 	if err := kv(cmd.OutOrStdout(), [][2]string{
 		{"Kind", "Monitor"}, {"Stable ID", resource.Metadata.ID}, {"Name", name}, {"UID", resource.Metadata.UID},
@@ -241,7 +244,40 @@ func describeMonitor(cmd *cobra.Command, resource api.Resource, name string) err
 	}); err != nil {
 		return err
 	}
+	if err := writeRecoveryDecision(cmd, status.RecoveryDecision); err != nil {
+		return err
+	}
+	if err := writeRecoveryAdmission(cmd, status.RecoveryAdmission); err != nil {
+		return err
+	}
 	return writeNotificationConditions(cmd, status.NotificationConditions, status.NotificationConditionsTruncated)
+}
+
+func writeRecoveryDecision(cmd *cobra.Command, d *api.RecoveryDecision) error {
+	if d != nil {
+		selected := "unavailable"
+		if d.Selected != nil {
+			selected = d.Selected.RuleID + " (" + d.Selected.Driver + ")"
+		}
+		if err := kv(cmd.OutOrStdout(), [][2]string{{"Failure taxonomy", d.TaxonomyVersion}, {"Candidate rule", strOrDash(d.CandidateRuleID)}, {"Selected rule", selected}, {"Rule qualification", fmt.Sprintf("%d/%d", d.QualifyingObservations, d.RequiredObservations)}, {"Rule decision", d.Reason}, {"Qualification reason", managementDisplay(d.QualificationReason)}, {"Decision revision", d.DecisionRevision}, {"Configuration revision", d.ConfigurationRevision}, {"Decision observation", strOrDash(d.ObservationID)}}); err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
+func writeRecoveryAdmission(cmd *cobra.Command, a *api.RecoveryAdmission) error {
+	if a != nil {
+		return kv(cmd.OutOrStdout(), [][2]string{
+			{"Admission assessment (not execution permission)", managementDisplay(a.Reason)},
+			{"Intervention attempts used", fmt.Sprintf("%d/%d", a.AttemptsUsed, a.AttemptLimit)},
+			{"Execution deadline", observationTimestamp(a.Deadline)},
+			{"Cooldown until", observationTimestamp(a.NotBefore)},
+			{"Assessment observed at", observationTimestamp(&a.ObservedAt)},
+		})
+	}
+	return nil
 }
 
 func operationCount(value *int64) string {

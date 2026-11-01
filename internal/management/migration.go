@@ -28,7 +28,10 @@ func ExtractInlineCredentials(input api.Resource) (api.Resource, []api.Resource,
 		return api.Resource{}, nil, ErrValidation
 	}
 	resource, err := api.DecodeResource(raw)
-	if err != nil || !supportedKind(resource.Kind) || !validID(resource.Metadata.ID) {
+	if err != nil {
+		return api.Resource{}, nil, err
+	}
+	if !supportedKind(resource.Kind) || !validID(resource.Metadata.ID) {
 		return api.Resource{}, nil, ErrValidation
 	}
 	var credentials []api.Resource
@@ -103,7 +106,7 @@ func ExtractInlineCredentials(input api.Resource) (api.Resource, []api.Resource,
 			return api.Resource{}, nil, ErrValidation
 		}
 		if err := extract("notification", "notification", &driver); err != nil {
-			return api.Resource{}, nil, err
+			return api.Resource{}, nil, api.PrefixValidationError("spec", err)
 		}
 		resource.Spec, _ = json.Marshal(driver)
 	case "Monitor":
@@ -112,12 +115,16 @@ func ExtractInlineCredentials(input api.Resource) (api.Resource, []api.Resource,
 			return api.Resource{}, nil, ErrValidation
 		}
 		if err := extract("check", "check", &spec.Check.Driver); err != nil {
-			return api.Resource{}, nil, err
+			return api.Resource{}, nil, api.PrefixValidationError("spec.check.driver", err)
 		}
-		if spec.Recovery != nil {
-			if err := extract("recovery", "recovery", &spec.Recovery.Driver); err != nil {
-				return api.Resource{}, nil, err
+		if err := api.VisitRecoveryDrivers(spec.Recovery, func(field string, d *api.DriverConfig) error {
+			slot := "recovery"
+			if field != "driver" {
+				slot += "." + field
 			}
+			return api.PrefixValidationError("spec.recovery."+field, extract(slot, "recovery", d))
+		}); err != nil {
+			return api.Resource{}, nil, err
 		}
 		if spec.Notifications != nil {
 			colors := make([]string, 0, len(*spec.Notifications))
@@ -129,7 +136,7 @@ func ExtractInlineCredentials(input api.Resource) (api.Resource, []api.Resource,
 				rule := (*spec.Notifications)[color]
 				if rule.Driver != nil {
 					if err := extract("notification/"+color, "notification", rule.Driver); err != nil {
-						return api.Resource{}, nil, err
+						return api.Resource{}, nil, api.PrefixValidationError("spec.notifications."+color+".driver", err)
 					}
 					(*spec.Notifications)[color] = rule
 				}

@@ -170,6 +170,11 @@ func (f *machine) applyWorkerPoll(c WorkerSessionCommand, at time.Time, versions
 		}
 	}
 	f.image.Version = max(f.image.Version, WorkerSessionFormatVersion)
+	for _, capability := range request.Capabilities {
+		if capability.ProtocolVersion != "" {
+			f.image.Version = joinStorageFormat(f.image.Version, WorkerRecoveryRulesFormatVersion)
+		}
+	}
 	if len(c.ProposedLeaseIDs) > 0 {
 		f.image.Version = max(f.image.Version, WorkerOfferFormatVersion)
 	}
@@ -202,6 +207,11 @@ func validateWorkerSessionImage(i image) error {
 		}
 		worker, ok := i.WorkerPolicy.Workers[r.WorkerID]
 		request, response := r.Request, r.Response
+		for _, capability := range request.Capabilities {
+			if capability.ProtocolVersion != "" && i.Version != WorkerRecoveryRulesFormatVersion && i.Version != WorkerDispatchFormatVersion {
+				return ErrWorkerSessionInvalid
+			}
+		}
 		if !ok || worker.UID != key || r.WorkerUID != key || request.WorkerID != r.WorkerID || !catalogIdentifier(r.OwnerEpoch, 256) || request.validate() != nil || r.RequestDigest != workerPollDigest(request) || r.OpenedAt.IsZero() || r.OpenedAt.Year() < 1 || r.UpdatedAt.Before(r.OpenedAt) || r.UpdatedAt.Year() > 9998 || !response.SessionExpiresAt.Equal(r.UpdatedAt.Add(WorkerSessionLifetime)) || response.ServerID != workerProtocolServerID(state.NodeID, state.PolicyEpoch) || response.ServerID != request.ServerID || response.WorkerUID != key || response.ClientSessionID != request.ClientSessionID || response.PollSequence != request.PollSequence || !catalogIdentifier(response.SessionID, 256) || request.SessionID != "" && response.SessionID != request.SessionID || request.SessionID == "" && !r.OpenedAt.Equal(r.UpdatedAt) {
 			return ErrWorkerSessionInvalid
 		}

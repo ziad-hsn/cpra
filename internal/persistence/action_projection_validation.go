@@ -24,6 +24,11 @@ func validateActionProjection(m Monitor, version int) error {
 	if p.LatestRecovery != nil && (!m.OwnsAction(*p.LatestRecovery) || p.LatestRecovery.Kind != "intervention" || p.LatestRecovery.IncidentID != "" && p.LatestRecovery.IncidentID != m.IncidentID) {
 		return errActionLedger
 	}
+	if p.LatestRecovery != nil {
+		if err := validateActionRule(*p.LatestRecovery, version); err != nil {
+			return err
+		}
+	}
 	blue := 0
 	for _, a := range m.Actions {
 		if a.State != Queued && a.State != Started {

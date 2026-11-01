@@ -275,7 +275,10 @@ func (m *managementHTTP) validateCollectionPreflight(ctx context.Context, reques
 		}
 		inputs[i] = management.CollectionInput{Resource: resource, SourceID: item.Source, ItemID: fmt.Sprintf("item.%020d", item.Ordinal)}
 		if len(result.Warnings) < 100 {
-			for _, warning := range api.ResourceWarnings(resource) {
+			for _, warning := range m.catalog.ConfigurationWarnings(ctx, resource) {
+				if len(result.Warnings) == 100 {
+					break
+				}
 				warning.Field = fmt.Sprintf("items[%d].resource.%s", i, warning.Field)
 				result.Warnings = append(result.Warnings, warning)
 			}

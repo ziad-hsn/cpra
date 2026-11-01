@@ -23,6 +23,7 @@ func (j *JobStorage) LocalCheck() bool {
 type ExternalJobStorage struct {
 	Check         *manifest.ExternalRuntimeBinding
 	Recovery      *manifest.ExternalRuntimeBinding
+	RecoveryRules map[string]*manifest.ExternalRuntimeBinding
 	Notifications map[string][]*manifest.ExternalRuntimeBinding
 }
 
@@ -43,6 +44,12 @@ func (s *ExternalJobStorage) Clone() *ExternalJobStorage {
 		return &cloned
 	}
 	cloned := &ExternalJobStorage{Check: copyBinding(s.Check), Recovery: copyBinding(s.Recovery)}
+	if s.RecoveryRules != nil {
+		cloned.RecoveryRules = make(map[string]*manifest.ExternalRuntimeBinding, len(s.RecoveryRules))
+	}
+	for id, binding := range s.RecoveryRules {
+		cloned.RecoveryRules[id] = copyBinding(binding)
+	}
 	if s.Notifications != nil {
 		cloned.Notifications = make(map[string][]*manifest.ExternalRuntimeBinding, len(s.Notifications))
 	}

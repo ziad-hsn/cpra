@@ -17,12 +17,17 @@ const fairDriverLimit = 64
 // Flows exist only while they have accepted pending or active work, so their
 // count is bounded by queue capacity plus the global execution limit.
 type FairQueue struct {
+	pendingActions                                map[string]map[string]*jobs.Dispatch
+	rates                                         map[string]*notificationRate
 	mu                                            sync.Mutex
 	drivers                                       map[string]*fairDriver
 	order                                         []*fairDriver
 	next, depth, active, capacity, executionLimit int
 	closed                                        bool
 	serialFlows                                   bool
+	notifications                                 bool
+	outstanding                                   int // Executions retained until both publication and owner acknowledgement.
+	concurrency                                   map[string]int
 	wakeup                                        chan struct{}
 	started, lastEnqueue, lastDequeue             time.Time
 	first, last                                   *fairEntry
@@ -39,11 +44,13 @@ type fairDriver struct {
 	first                     *fairFlow // Circular list of flows with pending work only.
 	depth, active             int
 	dropped, timeouts         int64
+	rateDeferred              int64
 	activeFirst, activeLast   *fairLease
 	pendingFirst, pendingLast *fairEntry
 }
 
 type fairFlow struct {
+	sequences      map[string]bool
 	key            uint64
 	first, last    *fairEntry
 	depth          int
@@ -51,12 +58,18 @@ type fairFlow struct {
 	previous, next *fairFlow
 }
 type fairEntry struct {
+	rateDeferred             bool
+	sequence                 string
 	job                      jobs.Job
 	at                       time.Time
 	next, older, newer       *fairEntry
 	driverOlder, driverNewer *fairEntry
 }
 type fairLease struct {
+	rateScopes          []jobs.NotificationRateScope
+	sequence            string
+	fenced              bool
+	completed, released bool
 	jobs.Job
 	queue          *FairQueue
 	driver         *fairDriver
@@ -103,7 +116,15 @@ func (l *fairLease) complete(result jobs.Result) {
 	f.active--
 	d.active--
 	q.active--
-	if f.active == 0 && f.first == nil {
+	l.completed = true
+	if q.notifications && (!l.fenced || l.released) {
+		q.outstanding--
+	}
+	if !l.fenced {
+		delete(f.sequences, l.sequence)
+		q.releaseNotificationRates(l, result)
+	}
+	if f.active == 0 && f.first == nil && len(f.sequences) == 0 {
 		delete(d.flows, f.key)
 	}
 	if l.previous != nil {
@@ -127,18 +148,21 @@ func (l *fairLease) complete(result jobs.Result) {
 }
 
 type DriverQueueStats struct {
-	Driver            string        `json:"driver"`
-	RequestedCapacity int           `json:"requested_capacity"`
-	ReservedCapacity  int           `json:"reserved_capacity"`
-	Pending           int           `json:"pending"`
-	Active            int           `json:"active"`
-	ConcurrencyLimit  int           `json:"concurrency_limit"`
-	AdmissionLimit    int           `json:"admission_limit"`
-	OldestPendingAge  time.Duration `json:"oldest_pending_age"`
-	OldestActiveAge   time.Duration `json:"oldest_active_age"`
-	Rejections        int64         `json:"rejections"`
-	Timeouts          int64         `json:"timeouts"`
-	Condition         string        `json:"condition"`
+	DestinationConcurrency *int          `json:"destination_concurrency,omitempty"`
+	WorkerHeadroom         int           `json:"worker_headroom"`
+	RateDeferredTotal      int64         `json:"rate_deferred_total"`
+	Driver                 string        `json:"driver"`
+	RequestedCapacity      int           `json:"requested_capacity"`
+	ReservedCapacity       int           `json:"reserved_capacity"`
+	Pending                int           `json:"pending"`
+	Active                 int           `json:"active"`
+	ConcurrencyLimit       int           `json:"concurrency_limit"`
+	AdmissionLimit         int           `json:"admission_limit"`
+	OldestPendingAge       time.Duration `json:"oldest_pending_age"`
+	OldestActiveAge        time.Duration `json:"oldest_active_age"`
+	Rejections             int64         `json:"rejections"`
+	Timeouts               int64         `json:"timeouts"`
+	Condition              string        `json:"condition"`
 }
 
 // NewFairQueue registers compiled check drivers unless names are supplied.
@@ -166,8 +190,9 @@ func NewFairQueue(capacity int, names ...string) (*FairQueue, error) {
 	return q, nil
 }
 
-// NewActionQueue serializes each private destination while permitting unrelated
-// destinations to progress. Identities are never exported as metric labels.
+// NewActionQueue preserves intervention destination serialization. Notifications
+// additionally permit bounded independent sequences at each private destination.
+// Identities are never exported as metric labels.
 func NewActionQueue(capacity int, kind string) (*FairQueue, error) {
 	var names []string
 	for _, c := range jobs.Capabilities() {
@@ -180,7 +205,9 @@ func NewActionQueue(capacity int, kind string) (*FairQueue, error) {
 	}
 	q, err := NewFairQueue(capacity, names...)
 	if err == nil {
-		q.serialFlows = true
+		q.serialFlows = kind != "notification"
+		q.notifications = kind == "notification"
+		q.concurrency = map[string]int{"webhook": 4}
 	}
 	return q, err
 }
@@ -216,18 +243,33 @@ func (q *FairQueue) Enqueue(job jobs.Job) error {
 	// capacity is still available. No accepted work is evicted to make this room.
 	reservedForNewFlow := f != nil &&
 		(q.capacity > 1 && q.depth >= q.capacity-1 || admissionLimit > 1 && d.depth >= admissionLimit-1)
-	if reservedForNewFlow || q.depth >= q.capacity || d.depth >= admissionLimit || f != nil && f.depth >= max(1, admissionLimit/2) {
+	retainedFull := q.notifications && q.depth+q.outstanding >= q.capacity+q.executionLimit
+	if retainedFull || reservedForNewFlow || q.depth >= q.capacity || d.depth >= admissionLimit || f != nil && f.depth >= max(1, admissionLimit/2) {
 		q.dropped++
 		d.dropped++
 		return ErrQueueFull
 	}
 	now := time.Now()
 	job.SetEnqueueTime(now)
+	if dispatch, ok := job.(*jobs.Dispatch); ok && q.notifications && dispatch.ActionID != "" {
+		if q.pendingActions == nil {
+			q.pendingActions = map[string]map[string]*jobs.Dispatch{}
+		}
+		if q.pendingActions[dispatch.MonitorID] == nil {
+			q.pendingActions[dispatch.MonitorID] = map[string]*jobs.Dispatch{}
+		}
+		q.pendingActions[dispatch.MonitorID][dispatch.ActionID] = dispatch
+	}
 	if f == nil {
 		f = &fairFlow{key: key}
 		d.flows[key] = f
 	}
 	e := &fairEntry{job: job, at: now, older: q.last}
+	if q.notifications {
+		if sequenced, ok := job.(interface{ NotificationSequence() string }); ok {
+			e.sequence = sequenced.NotificationSequence()
+		}
+	}
 	if q.last != nil {
 		q.last.newer = e
 	} else {
@@ -303,14 +345,52 @@ func (q *FairQueue) take(capacity int, reserve bool) (jobs.Job, error) {
 		flowLimit := fairShare(driverLimit, len(d.flows))
 		if q.serialFlows {
 			flowLimit = 1
+		} else if q.notifications {
+			limit := q.concurrency[d.name]
+			if limit == 0 {
+				limit = 1
+			}
+			flowLimit = min(flowLimit, limit)
 		}
 		first := d.first
 		f := first
 		for f != nil {
 			next := f.next
-			if !reserve || f.active < flowLimit {
-				e := f.first
-				f.first = e.next
+			e, previous := f.first, (*fairEntry)(nil)
+			if q.notifications && reserve {
+				for e != nil && !cancelledDispatch(e.job) {
+					// Ordered followers are already ineligible. Do not walk the
+					// limiter registry merely to count another reason to wait.
+					if f.sequences[e.sequence] {
+						previous, e = e, e.next
+						continue
+					}
+					paced := !q.notificationRateAvailable(e.job, time.Now())
+					if paced && !e.rateDeferred {
+						e.rateDeferred = true
+						d.rateDeferred++
+					}
+					if !paced {
+						break
+					}
+					previous, e = e, e.next
+				}
+			}
+			if e != nil && (!reserve || f.active < flowLimit) {
+				if dispatch, ok := e.job.(*jobs.Dispatch); ok && q.notifications {
+					delete(q.pendingActions[dispatch.MonitorID], dispatch.ActionID)
+					if len(q.pendingActions[dispatch.MonitorID]) == 0 {
+						delete(q.pendingActions, dispatch.MonitorID)
+					}
+				}
+				if previous == nil {
+					f.first = e.next
+				} else {
+					previous.next = e.next
+				}
+				if f.last == e {
+					f.last = previous
+				}
 				f.depth--
 				if f.first == nil {
 					f.last = nil
@@ -347,8 +427,8 @@ func (q *FairQueue) take(capacity int, reserve bool) (jobs.Job, error) {
 				q.totalWait += wait
 				q.maxWait = max(q.maxWait, wait)
 				q.lastDequeue = now
-				if !reserve {
-					if f.active == 0 && f.first == nil {
+				if !reserve || cancelledDispatch(e.job) {
+					if f.active == 0 && f.first == nil && len(f.sequences) == 0 {
 						delete(d.flows, f.key)
 					}
 					return e.job, nil
@@ -356,7 +436,17 @@ func (q *FairQueue) take(capacity int, reserve bool) (jobs.Job, error) {
 				f.active++
 				d.active++
 				q.active++
-				lease := &fairLease{Job: e.job, queue: q, driver: d, flow: f, at: now, previous: d.activeLast}
+				if q.notifications {
+					q.outstanding++
+					if f.sequences == nil {
+						f.sequences = map[string]bool{}
+					}
+					f.sequences[e.sequence] = true
+				}
+				lease := &fairLease{sequence: e.sequence, Job: e.job, queue: q, driver: d, flow: f, at: now, previous: d.activeLast}
+				if q.notifications {
+					lease.rateScopes = q.reserveNotificationRates(e.job)
+				}
 				if d.activeLast != nil {
 					d.activeLast.next = lease
 				} else {
@@ -402,6 +492,9 @@ func (q *FairQueue) Stats() Stats {
 	_, cv, samples := q.arrivals.snapshot()
 	elapsed := time.Since(q.started)
 	stats := Stats{ArrivalCV: cv, ArrivalSamples: samples, Capacity: q.capacity, QueueDepth: q.depth, Enqueued: q.enqueued, Dequeued: q.dequeued, Dropped: q.dropped, LastEnqueue: q.lastEnqueue.UTC(), LastDequeue: q.lastDequeue.UTC(), MaxQueueTime: q.maxWait, SampleWindow: elapsed, OldestPendingReason: "queue_empty"}
+	if q.notifications {
+		stats.AwaitingReconciliation = max(0, q.outstanding-q.active)
+	}
 	if q.dequeued > 0 {
 		stats.AvgQueueTime = q.totalWait / time.Duration(q.dequeued)
 	}
@@ -423,6 +516,15 @@ func (q *FairQueue) driverStats() []DriverQueueStats {
 	for i, d := range q.order {
 		limit := q.executionLimitFor(d, q.executionLimit, reserved)
 		s := DriverQueueStats{Driver: d.name, Pending: d.depth, Active: d.active, RequestedCapacity: d.reservation, ReservedCapacity: reserved[i], ConcurrencyLimit: limit, AdmissionLimit: q.admissionLimit(d), Rejections: d.dropped, Timeouts: d.timeouts, Condition: "idle"}
+		s.WorkerHeadroom = max(0, limit-d.active)
+		s.RateDeferredTotal = d.rateDeferred
+		if q.notifications || q.serialFlows {
+			concurrency := 1
+			if q.notifications && q.concurrency[d.name] > 0 {
+				concurrency = q.concurrency[d.name]
+			}
+			s.DestinationConcurrency = &concurrency
+		}
 		if d.pendingFirst != nil {
 			s.OldestPendingAge = time.Since(d.pendingFirst.at)
 		}

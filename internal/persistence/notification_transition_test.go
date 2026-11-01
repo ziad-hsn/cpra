@@ -126,14 +126,14 @@ func TestNotificationSnapshotThenNewObservation(t *testing.T) {
 	s.fsm.image.Monitors[m.ID] = m.Clone()
 	c := Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: m.Generation + 1,
 		At: policyTime().Add(1250 * time.Millisecond), Outcome: "failure"}
-	if commandWriteFormat(c) != ActionFormatVersion || commandMinimumFormat(c) != FormatVersion {
+	if commandWriteFormat(c) != DispatchFormatVersion || commandMinimumFormat(c) != FormatVersion {
 		t.Fatal("new writer policy changed the historical reader minimum")
 	}
 	if r := submit(t, s, c)[0]; r.Err != nil {
 		t.Fatal(r.Err)
 	}
 	raw := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(raw, []byte(actionSnapshotMagic)) {
+	if !bytes.HasPrefix(raw, []byte(dispatchSnapshotMagic)) {
 		t.Fatal("snapshot did not preserve notification semantics")
 	}
 	if err := s.fsm.Restore(io.NopCloser(bytes.NewReader(raw))); err != nil {

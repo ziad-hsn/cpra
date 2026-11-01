@@ -49,6 +49,15 @@ it('keeps only bounded collection identity metadata, including explicit rejectio
   expect(pending.validated).toBeUndefined();
 });
 
+it.each(['cpra.file.base.v1', 'cpra.file.base.v2', 'cpra.file.base.v3', 'cpra.file.base.v4', 'cpra.file.base.v5'])('retains validation controls for admitted profile %s', async normalizationProfile => {
+  const receipt = operation({normalizationProfile});
+  expect(supportedCollectionIdentity(operationView(receipt))).toEqual({...identity, normalizationProfile});
+  const state = await setup({receipt, reply: () => json({...result(), normalizationProfile})});
+  await read();
+  await waitFor(() => expect(state.reads).toHaveLength(1));
+  expect(screen.getByText('monitor-1')).toBeInTheDocument();
+});
+
 it.each([
   { identityFormat: undefined }, { itemCount: undefined }, { identityFormat: null }, { identityFormat: '' }, { identityFormat: 'x'.repeat(129) },
   { itemCount: null }, { itemCount: -1 }, { itemCount: 10_000_001 }, { itemCount: 1.5 }, { contentDigest: `sha256:${'a'.repeat(64)}` },

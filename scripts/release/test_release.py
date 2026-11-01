@@ -39,7 +39,7 @@ class ReleaseTests(unittest.TestCase):
     def test_storage_recipe_matches_current_reader(self):
         self.assertEqual(release.storage_format(release.RECIPE['build_tags']), release.RECIPE['storage_format_version'])
         self.assertNotIn('externaljobs', release.RECIPE['build_tags'])
-        self.assertEqual(release.storage_format(['externaljobs']), 47)
+        self.assertEqual(release.storage_format(['externaljobs']), 51)
 
     def test_manifest_rejects_previous_storage_format_even_with_matching_recipe(self):
         manifest = manifest_fixture()

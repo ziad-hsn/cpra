@@ -9,6 +9,10 @@ import (
 // Result is a generic structure for returning the outcome of a job.
 // It includes the entity it belongs to, any error that occurred, and a flexible payload.
 type Result struct {
+	RateFeedback *NotificationRateFeedback
+	// ReleaseDispatch releases only local sequence bookkeeping after the owner
+	// has reconciled the durable result. It is idempotent and carries no authority.
+	ReleaseDispatch             func() `json:"-"`
 	Attempts, AttemptTimeouts   int
 	AttemptDuration, RetryDelay time.Duration
 	// ProjectionVersion identifies the private resource preparation selected by

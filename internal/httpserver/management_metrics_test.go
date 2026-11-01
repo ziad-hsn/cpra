@@ -10,8 +10,52 @@ import (
 
 	"github.com/ziad-hsn/cpra/internal/controller"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 	"github.com/ziad-hsn/cpra/internal/queue"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 )
+
+func TestActionMetricsExposeOnlyBoundedCommittedOutcomes(t *testing.T) {
+	settings := runtimeconfig.Default()
+	settings.Storage.Mode, settings.Storage.Directory = "memory", t.TempDir()
+	store, err := persistence.Open(t.Context(), settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	m := persistence.Monitor{ID: "private-monitor", Revision: "private-revision", Policy: persistence.Policy{Enabled: true, Interval: time.Second, Unhealthy: 1, Healthy: 1, Endpoints: map[string]int{"red": 1}}}
+	at := time.Now().UTC()
+	for _, command := range []persistence.Command{
+		{Kind: "configure", Config: &m, At: at},
+		{Kind: "pulse", Generation: 1, Outcome: "failure", At: at.Add(time.Second)},
+		{Kind: "pulse", Generation: 2, Outcome: "success", At: at.Add(2 * time.Second)},
+	} {
+		command.MonitorID, command.Revision = m.ID, m.Revision
+		result, err := store.Submit(t.Context(), []persistence.Command{command})
+		if err != nil || len(result) != 1 || result[0].Err != nil || result[0].Monitor == nil {
+			t.Fatal("committed cancellation fixture", result, err)
+		}
+	}
+	s := newTestServer(t)
+	s.cfg.Store = store
+	response := httptest.NewRecorder()
+	s.handleMetrics(response, httptest.NewRequest("GET", "/metrics", nil))
+	body := response.Body.String()
+	for _, sample := range []string{
+		`cpra_action_cancellations_total{pipeline="code"} 1`,
+		`cpra_action_cancellations_total{pipeline="intervention"} 0`,
+		`cpra_action_exhaustions_total{pipeline="code",reason="attempt_limit"} 0`,
+		`cpra_action_exhaustions_total{pipeline="intervention",reason="execution_deadline"} 0`,
+		`cpra_action_definite_rejections_total{pipeline="code"} 0`,
+	} {
+		if !strings.Contains(body, sample+"\n") {
+			t.Error("missing bounded terminal counter", sample)
+		}
+	}
+	if strings.Contains(body, "private-") || strings.Contains(body, settings.Storage.Directory) {
+		t.Fatal("metric exposed private action or storage identity")
+	}
+}
 
 func TestMonitorMetricsSeparateAvailabilityAndSuppression(t *testing.T) {
 	s := newTestServer(t)

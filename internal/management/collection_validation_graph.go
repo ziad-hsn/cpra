@@ -24,6 +24,9 @@ func (v *collectionValidator) validateSet(ctx context.Context, resources map[per
 		if err := v.catalog.options.validateDesired(&r); err != nil {
 			return key, stagedValidationError(err)
 		}
+		if err := v.catalog.validateRecoveryRuleContract(ctx, r); err != nil {
+			return key, stagedValidationError(err)
+		}
 		refs, err := directReferences(r)
 		if err != nil {
 			return key, ErrValidation

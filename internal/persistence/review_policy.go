@@ -35,11 +35,11 @@ func reviewPolicyDigest(m Monitor, count int, explicit bool) hash.Hash {
 
 func reviewPolicyIdentity(m Monitor) string {
 	count := m.Policy.Endpoints["blue"]
-	explicit := len(m.Policy.NotificationEndpointIDs["blue"]) != 0 || len(m.Policy.NotificationTimeouts["blue"]) != 0
+	explicit := len(m.Policy.NotificationEndpointIDs["blue"]) != 0 || len(m.Policy.NotificationTimeouts["blue"]) != 0 || len(m.Policy.NotificationBindings["blue"]) != 0
 	h := reviewPolicyDigest(m, count, explicit)
 	if explicit {
 		for n := 0; n < count; n++ {
-			_ = json.NewEncoder(h).Encode(reviewDestination{ID: notificationEndpointIdentity(m, "blue", n), Timeout: m.Policy.notificationTimeout("blue", n)})
+			_ = json.NewEncoder(h).Encode(reviewDestination{ID: notificationEndpointIdentity(m, "blue", n), Timeout: m.Policy.notificationTimeout("blue", n), Binding: m.reviewBinding(n)})
 		}
 	}
 	return hex.EncodeToString(h.Sum(nil))
@@ -47,7 +47,7 @@ func reviewPolicyIdentity(m Monitor) string {
 
 func (f *machine) captureReviewPolicy(m *Monitor) error {
 	count := m.Policy.Endpoints["blue"]
-	explicit := len(m.Policy.NotificationEndpointIDs["blue"]) != 0 || len(m.Policy.NotificationTimeouts["blue"]) != 0
+	explicit := len(m.Policy.NotificationEndpointIDs["blue"]) != 0 || len(m.Policy.NotificationTimeouts["blue"]) != 0 || len(m.Policy.NotificationBindings["blue"]) != 0
 	id := reviewPolicyIdentity(*m)
 	key := reviewPolicyKey(m.ID, id, -1)
 	if row, ok, err := f.readReview(key); err != nil {
@@ -60,7 +60,7 @@ func (f *machine) captureReviewPolicy(m *Monitor) error {
 			for offset := 0; offset < count; offset += reviewPolicyPageSize {
 				page := reviewPolicyPage{ID: id, Count: count, Explicit: true, Offset: offset}
 				for n := offset; n < min(count, offset+reviewPolicyPageSize); n++ {
-					page.Destinations = append(page.Destinations, reviewDestination{ID: notificationEndpointIdentity(*m, "blue", n), Timeout: m.Policy.notificationTimeout("blue", n)})
+					page.Destinations = append(page.Destinations, reviewDestination{ID: notificationEndpointIdentity(*m, "blue", n), Timeout: m.Policy.notificationTimeout("blue", n), Binding: m.reviewBinding(n)})
 				}
 				f.writeReview(reviewRecord{Key: reviewPolicyKey(m.ID, id, offset), MonitorID: m.ID, Policy: &page})
 			}
@@ -114,6 +114,7 @@ func (f *machine) reviewInput(fact reviewFact, endpoint int) (Monitor, error) {
 		}
 		m.reviewEndpointIDs = map[int]string{endpoint: destination.ID}
 		m.reviewTimeouts = map[int]time.Duration{endpoint: destination.Timeout}
+		m.reviewBindings = map[int]string{endpoint: destination.Binding}
 	}
 	return m, nil
 }
@@ -136,6 +137,9 @@ func (v *collectionLedgerView) validateReviewPolicy(m Monitor, id string, fence 
 				return errActionLedger
 			}
 			for _, d := range r.Policy.Destinations {
+				if d.Binding != "" && m.ActionVersion != DispatchFormatVersion {
+					return errActionLedger
+				}
 				_ = json.NewEncoder(h).Encode(d)
 			}
 		}

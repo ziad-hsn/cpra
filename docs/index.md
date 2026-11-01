@@ -80,3 +80,5 @@ the capacity available to your configured checks and destinations.
 Use the [Go SDK](sdk/index.md) for monitor management, incident controls, collections
 and observations. The [management guide](cpractl-management.md) explains conditional
 writes and how to continue an interrupted collection without duplicating changes.
+
+Error-dependent recovery is described in [Intervention rules](intervention-rules.md), including offline selection tests and safe upgrade requirements.

@@ -27,6 +27,7 @@ var reviewReadyBucket = []byte("action_review_ready")
 type reviewDestination struct {
 	ID      string        `json:"id"`
 	Timeout time.Duration `json:"timeout"`
+	Binding string        `json:"binding,omitempty"`
 }
 
 type reviewFact struct {
@@ -94,7 +95,7 @@ func encodeReviewRecord(r reviewRecord) ([]byte, error) {
 			return nil, errActionLedger
 		}
 		for _, d := range p.Destinations {
-			if !bootstrapHash(d.ID) || d.Timeout <= 0 || d.Timeout > 24*time.Hour {
+			if !bootstrapHash(d.ID) || d.Timeout <= 0 || d.Timeout > 24*time.Hour || d.Binding != "" && !bootstrapHash(d.Binding) {
 				return nil, errActionLedger
 			}
 		}

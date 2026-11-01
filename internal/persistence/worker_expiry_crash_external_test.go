@@ -4,11 +4,13 @@ package persistence
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -122,6 +124,17 @@ func TestWorkerExpirySurvivesProcessKill(t *testing.T) {
 				defer s.Close()
 				m, _ := s.Get(saved.Monitor.ID)
 				expected := saved.Monitor.Clone()
+				// The fixture replays format 45 with an absolute action deadline.
+				// Current recovery adds notification-state and installation metadata;
+				// the comparison below still checks every original action field.
+				if expected.Notifications == nil || expected.Notifications.Version != 0 {
+					t.Fatal("fixture must retain pre-condition notification state")
+				}
+				expected.Notifications.Version = NotificationConditionFormatVersion
+				if expected.InstallationID != "" || s.nodeID != admin.nodeID {
+					t.Fatal("fixture must migrate the original unnamespaced installation")
+				}
+				expected.InstallationID = identity("installation/" + admin.nodeID)
 				if category == "recovery" && phase == "before" {
 					if m.RecoveryCheckAfter.Before(openedAt) || m.RecoveryCheckAfter.After(time.Now().UTC()) {
 						t.Fatal("restart did not require a fresh check for the queued recovery")
@@ -131,7 +144,26 @@ func TestWorkerExpirySurvivesProcessKill(t *testing.T) {
 				got, _ = json.Marshal(m)
 				want, _ = json.Marshal(expected)
 				if string(got) != string(want) {
-					t.Fatal("restart changed state beyond the recovery check barrier")
+					var actual, original map[string]json.RawMessage
+					if err := json.Unmarshal(got, &actual); err != nil {
+						t.Fatal(err)
+					}
+					if err := json.Unmarshal(want, &original); err != nil {
+						t.Fatal(err)
+					}
+					var fields []string
+					for key, value := range actual {
+						if !bytes.Equal(value, original[key]) {
+							fields = append(fields, key)
+						}
+					}
+					for key := range original {
+						if _, ok := actual[key]; !ok {
+							fields = append(fields, key)
+						}
+					}
+					slices.Sort(fields)
+					t.Fatalf("restart changed fields beyond the recovery check barrier: %v", fields)
 				}
 				wantEvents := 1
 				if phase == "before" {

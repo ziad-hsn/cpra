@@ -19,6 +19,9 @@ func requiresActionFormat(m Monitor) bool {
 		return true
 	}
 	for _, a := range m.Actions {
+		if a.NotificationPermit != nil || a.NotificationFeedbackDigest != "" {
+			return true
+		}
 		if a.Retryable || a.ReviewNotice != nil {
 			return true
 		}
@@ -28,7 +31,7 @@ func requiresActionFormat(m Monitor) bool {
 
 func (m *Monitor) upgradeActions(at time.Time, emit func(string, *Action)) {
 	m.upgradeNotificationState()
-	if m.ActionVersion == ActionFormatVersion {
+	if actionStateVersion(m.ActionVersion) {
 		return
 	}
 	m.ActionVersion = ActionFormatVersion
@@ -43,6 +46,12 @@ func (m *Monitor) upgradeActions(at time.Time, emit func(string, *Action)) {
 }
 
 func validateActionFormat(m Monitor, version int) error {
+	if len(m.Policy.NotificationBindings) > 0 && !dispatchStorageFormat(version) {
+		return ErrNotificationIdentity
+	}
+	if err := validateRecoveryRuleState(m, version); err != nil {
+		return err
+	}
 	if err := validateActionProjection(m, version); err != nil {
 		return err
 	}
@@ -52,7 +61,7 @@ func validateActionFormat(m Monitor, version int) error {
 	if !requiresActionFormat(m) {
 		return nil
 	}
-	if !actionStorageFormat(version) || m.ActionVersion != 0 && m.ActionVersion != ActionFormatVersion || m.InstallationID != "" && !catalogIdentifier(m.InstallationID, 256) {
+	if m.ActionVersion == DispatchFormatVersion && !dispatchStorageFormat(version) || !actionStorageFormat(version) || m.ActionVersion != 0 && !actionStateVersion(m.ActionVersion) || m.InstallationID != "" && !catalogIdentifier(m.InstallationID, 256) {
 		return errors.New("invalid action storage version")
 	}
 	if m.ConfigurationProblem != (FailureDiagnostic{}) {
@@ -66,12 +75,15 @@ func validateActionFormat(m Monitor, version int) error {
 		if err := validateReviewNotice(a, version); err != nil {
 			return err
 		}
+		if err := validateNotificationActionLimits(a, version); err != nil {
+			return err
+		}
 		if a.ReviewNotice != nil && m.ActionProjection == nil {
 			if m.Notifications == nil {
 				return errors.New("review notification has no alert state")
 			}
 			alert, ok := m.Notifications.ReviewAlerts[a.ReviewNotice.AlertID]
-			if !ok || alert.ActionID != a.ReviewNotice.ActionID {
+			if !ok || alert.ActionID != a.ReviewNotice.ActionID || a.ReviewNotice.Phase == "close" && a.ReviewBinding != alert.Binding {
 				return errors.New("review notification has no matching alert")
 			}
 		}
@@ -90,23 +102,39 @@ func (p Policy) notificationTimeout(color string, endpoint int) time.Duration {
 }
 
 func (m Monitor) recoveryBudgetAvailable(at time.Time) bool {
-	if m.ActionVersion != ActionFormatVersion || m.recoveryAttempts() == 0 {
+	if !m.Policy.RecoveryRules.IsZero() && !m.RecoveryDecision.Deadline.IsZero() {
+		return m.recoveryDue(at).Before(m.RecoveryDecision.Deadline)
+	}
+	if !actionStateVersion(m.ActionVersion) || m.recoveryAttempts() == 0 {
 		return true
 	}
 	a, ok := m.latestRecovery()
+	if ok && m.waitingRecoveryBudget(a) {
+		return true
+	}
 	if due := a.FinishedAt.Add(m.Policy.RecoveryCooldown); due.After(at) {
 		at = due
 	}
 	return ok && !a.Deadline.IsZero() && at.Before(a.Deadline)
 }
 
-// Automatic continuation shares the original attempt's budget. A separate,
-// audited manual recovery is a new authorization and uses queueAction directly.
+// Continuation shares the original attempt's budget. Format 50 also applies
+// this boundary to audited manual attempts in the same incident.
 func (m *Monitor) queueRecoveryAttempt(at time.Time, emit func(string, *Action)) {
 	previous, exists := m.latestRecovery()
 	m.queueAction("intervention", "", 0, at, func(kind string, a *Action) {
-		if m.ActionVersion == ActionFormatVersion && exists && a != nil && kind == "action_queued" && a.Attempt > 1 {
+		if actionStateVersion(m.ActionVersion) && exists && a != nil && kind == "action_queued" && a.Attempt > 1 {
 			a.QueuedAt, a.Deadline = previous.QueuedAt, previous.Deadline
+			if m.ActionVersion == DispatchFormatVersion {
+				a.ExecutionBudget = previous.ExecutionBudget
+			}
+			m.Actions[a.ID] = *a
+		}
+		if !m.Policy.RecoveryRules.IsZero() && a != nil && kind == "action_queued" {
+			if !m.RecoveryDecision.Deadline.IsZero() {
+				a.Deadline = m.RecoveryDecision.Deadline
+			}
+			m.RecoveryDecision.Deadline = a.Deadline
 			m.Actions[a.ID] = *a
 		}
 		emit(kind, a)

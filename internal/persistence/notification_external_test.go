@@ -65,14 +65,14 @@ func TestNotificationWorkerStorageBoundary(t *testing.T) {
 	s, authority, _, input := workerResultFixture(t, "check", "success")
 	c := Command{Kind: "worker_result", At: time.Now().UTC(), commandExtensions: commandExtensions{
 		WorkerResult: &WorkerResultCommand{NodeID: s.nodeID, OwnerEpoch: s.executorSession, Authority: authority, Input: input}}}
-	if commandWriteFormat(c) != ActionWorkerFormatVersion || commandMinimumFormat(c) != WorkerResultFormatVersion {
+	if commandWriteFormat(c) != WorkerDispatchFormatVersion || commandMinimumFormat(c) != WorkerResultFormatVersion {
 		t.Fatal("worker writer changed the historical replay minimum")
 	}
 	if _, err := s.CommitWorkerResult(t.Context(), authority, input); err != nil {
 		t.Fatal(err)
 	}
 	raw := captureSnapshotBytes(t, s.fsm)
-	if !bytes.HasPrefix(raw, []byte(actionWorkerSnapshotMagic)) {
+	if !bytes.HasPrefix(raw, []byte(workerDispatchSnapshotMagic)) {
 		t.Fatal("worker snapshot lost its optional format boundary")
 	}
 	i, ledger, err := decodeSnapshot(bytes.NewReader(raw), "")
@@ -80,7 +80,7 @@ func TestNotificationWorkerStorageBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	if i.Version != ActionWorkerFormatVersion || i.WorkerExecutions == nil {
+	if i.Version != WorkerDispatchFormatVersion || i.WorkerExecutions == nil {
 		t.Fatal("worker snapshot lost execution state")
 	}
 	i.Version = NotificationFormatVersion

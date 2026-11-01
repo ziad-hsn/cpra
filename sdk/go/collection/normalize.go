@@ -15,7 +15,11 @@ import (
 // by browser imports and server-assisted reselection. It is independent of the
 // inventory HMAC format, compiler version and source-build hash. External job
 // resources and drivers are excluded even when this package has externaljobs.
-const FileNormalizationProfile = "cpra.file.base.v3"
+const FileNormalizationProfile = "cpra.file.base.v5"
+
+const fileNormalizationV4 = "cpra.file.base.v4"
+
+const fileNormalizationV3 = "cpra.file.base.v3"
 
 const fileNormalizationV2 = "cpra.file.base.v2"
 
@@ -26,7 +30,7 @@ const fileNormalizationV1 = "cpra.file.base.v1"
 // operations use FileNormalizationProfile. An empty profile is a distinct,
 // unprofiled contract and is not accepted here.
 func SupportsFileNormalization(profile string) bool {
-	return profile == FileNormalizationProfile || profile == fileNormalizationV2 || profile == fileNormalizationV1
+	return profile == FileNormalizationProfile || profile == fileNormalizationV4 || profile == fileNormalizationV3 || profile == fileNormalizationV2 || profile == fileNormalizationV1
 }
 
 // ErrUnsupportedNormalization identifies an unavailable normalization profile.
@@ -157,8 +161,16 @@ func fileBaseResource(r api.Resource, profile string) error {
 		if json.Unmarshal(r.Spec, &spec) != nil || !fileBaseDriver("check", spec.Check.Driver.Type, profile) {
 			return unsupported
 		}
-		if spec.Recovery != nil && !fileBaseDriver("recovery", spec.Recovery.Driver.Type, profile) {
+		if spec.Recovery != nil && len(spec.Recovery.Rules) > 0 && profile != FileNormalizationProfile && profile != fileNormalizationV4 {
 			return unsupported
+		}
+		if err := api.VisitRecoveryDrivers(spec.Recovery, func(_ string, driver *api.DriverConfig) error {
+			if !fileBaseDriver("recovery", driver.Type, profile) {
+				return unsupported
+			}
+			return nil
+		}); err != nil {
+			return err
 		}
 		if spec.Notifications != nil {
 			for _, rule := range *spec.Notifications {
@@ -178,7 +190,7 @@ func fileBaseResource(r api.Resource, profile string) error {
 
 func fileBaseDriver(category, kind, profile string) bool {
 	if kind == "a2a" && (category == "recovery" || category == "notification") {
-		return profile == FileNormalizationProfile || profile == fileNormalizationV2
+		return profile == FileNormalizationProfile || profile == fileNormalizationV4 || profile == fileNormalizationV3 || profile == fileNormalizationV2
 	}
 	switch category + "/" + kind {
 	case "check/http", "check/tcp", "check/icmp", "check/dns", "check/udp", "check/grpc", "check/docker",

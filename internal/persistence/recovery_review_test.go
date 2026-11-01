@@ -20,6 +20,7 @@ func manualFixture(t *testing.T, s *Store) (Monitor, *CatalogGuard) {
 	m, g := managedControlMonitor(t, s, "manual")
 	m.Policy.Unhealthy = 100
 	m.Policy.RecoveryMaxAttempts = 10
+	m.Policy.RecoveryTimeout = 2 * time.Hour
 	m.Policy.Endpoints = nil
 	r := submit(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, Guard: g, At: policyTime()})[0]
 	if r.Err != nil {
@@ -160,8 +161,12 @@ func TestManualRecoveryStrictGuardsAndStartRecheck(t *testing.T) {
 
 func localUnknown(t *testing.T, s *Store) (Monitor, Action, *CatalogGuard, *LocalExecution) {
 	t.Helper()
+	return localUnknownAt(t, s, policyTime().Add(2*time.Second))
+}
+
+func localUnknownAt(t *testing.T, s *Store, at time.Time) (Monitor, Action, *CatalogGuard, *LocalExecution) {
+	t.Helper()
 	m, g := manualFixture(t, s)
-	at := policyTime().Add(2 * time.Second)
 	m = *mustResult(t, s, manualCommand(m, g, "initial", at)).Monitor
 	a := latestManual(t, m)
 	h, err := s.BeginLocalAction(context.Background(), Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, Guard: g, At: at.Add(time.Second)})
@@ -177,8 +182,10 @@ func localUnknown(t *testing.T, s *Store) (Monitor, Action, *CatalogGuard, *Loca
 }
 func TestActionReviewExecutorFenceProviderFactsAndLateConflict(t *testing.T) {
 	s := openCatalogMemory(t)
-	m, a, g, h := localUnknown(t, s)
-	at := time.Now().UTC().Add(time.Minute)
+	m, a, g, h := localUnknownAt(t, s, time.Now().UTC())
+	returned := a.StartedAt.Add(2 * time.Second)
+	h.returnedAt.Store(&returned)
+	at := a.StartedAt.Add(time.Minute)
 	t.Cleanup(func() { _ = h.Finish(context.Background()) })
 	if r := submit(t, s, reviewCommand(m, a, "active-review", "rejected", at))[0]; !errors.Is(r.Err, ErrExecutorUnfenced) {
 		t.Fatal("active executor cleared", r.Err)
@@ -462,13 +469,15 @@ func TestActionReviewUnclassifiedCannotClearAndReturnsDetachedCopies(t *testing.
 
 func TestManualRecoveryReviewRejectionPreservesLongCooldown(t *testing.T) {
 	s := openCatalogMemory(t)
-	m, a, g, h := localUnknown(t, s)
+	m, a, g, h := localUnknownAt(t, s, time.Now().UTC())
+	returned := a.StartedAt.Add(2 * time.Second)
+	h.returnedAt.Store(&returned)
 	if err := h.Finish(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	m, _ = s.Get(m.ID)
 	a = retainedAction(t, s, a.ID)
-	at := time.Now().UTC().Add(time.Second)
+	at := a.StartedAt.Add(time.Minute)
 	m = *mustResult(t, s, reviewCommand(m, a, "cooldown-review", "rejected", at)).Monitor
 	m.Policy.RecoveryCooldown = time.Hour
 	m = *mustResult(t, s, Command{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &m, Guard: g, At: at}).Monitor

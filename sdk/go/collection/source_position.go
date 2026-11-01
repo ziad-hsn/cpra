@@ -60,7 +60,11 @@ func (i Item) ValidationError(err error) error {
 		for {
 			if point, ok := i.FieldPositions[path]; ok && point.Line > 0 && point.Column > 0 {
 				location.Line, location.Column = point.Line, point.Column
-				originalField = api.SafeValidationField(point.Field)
+				// The enclosing object's coordinate locates an omitted field;
+				// it must not replace the missing property's actionable name.
+				if path == sourceFieldKey(field.Field) {
+					originalField = api.SafeValidationField(point.Field)
+				}
 				break
 			}
 			end := strings.LastIndexAny(path, ".[ ")
@@ -103,6 +107,10 @@ func resourceFieldPositions(fields map[string]SourcePosition, manifest bool) map
 				canonical = "spec.check.driver.type"
 			case field == "pulse_check" || strings.HasPrefix(field, "pulse_check."):
 				canonical = "spec.check" + strings.TrimPrefix(field, "pulse_check")
+			case strings.HasPrefix(field, "intervention.rules["):
+				canonical = "spec.recovery" + strings.TrimPrefix(field, "intervention")
+				canonical = strings.Replace(canonical, "].target", "].driver.config", 1)
+				canonical = strings.Replace(canonical, "].action", "].driver.type", 1)
 			case strings.HasPrefix(field, "intervention.target"):
 				canonical = "spec.recovery.driver.config" + strings.TrimPrefix(field, "intervention.target")
 			case field == "intervention.action":

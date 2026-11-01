@@ -45,11 +45,12 @@ func incidentOf(m Monitor) IncidentRecord {
 }
 func statusOf(m Monitor) MonitorStatus {
 	conditions, truncated := m.NotificationConditions()
-	return MonitorStatus{NotificationConditions: conditions, NotificationConditionsTruncated: truncated, ConfigurationProblem: m.ConfigurationProblem, ConfigurationProblemAt: m.ConfigurationProblemAt, Ignored: m.Ignored, IgnoredAt: m.IgnoredAt, IgnoredBy: m.IgnoredBy, IgnoreCause: m.IgnoreCause, IgnoreReason: m.IgnoreReason, IgnoreIncidentCount: len(m.IgnoreIncidents), ObservedGeneration: m.ownerObserved.generation, ID: m.ID, CatalogUID: m.CatalogUID, CatalogRevision: m.CatalogRevision, Revision: m.Revision, ControlRevision: m.ControlRevision, IncidentID: m.IncidentID, IncidentRevision: m.IncidentRevision, SnoozedUntil: m.SnoozedUntil, LastCheck: m.LastCheck, LastSuccess: m.LastSuccess, NextCheck: m.NextCheck, Enabled: m.Policy.Enabled, Removed: m.Removed, Incident: m.Incident, Recovering: m.Recovering, Warning: m.Warning, LatencyAvailable: m.LatencyAvailable, Generation: m.Generation, TotalChecks: m.TotalChecks, SuccessfulChecks: m.SuccessfulChecks, LastOutcome: m.LastOutcome, LastFailure: m.LastFailure, LastLatency: m.LastLatency, UnknownActions: m.unknownActions, ActionsNeedingReview: m.heldActions}
+	return MonitorStatus{RecoveryDecision: m.RuleObservation(time.Now().UTC()), RecoveryAdmission: m.RecoveryAdmissionObservation(time.Now().UTC()), NotificationConditions: conditions, NotificationConditionsTruncated: truncated, ConfigurationProblem: m.ConfigurationProblem, ConfigurationProblemAt: m.ConfigurationProblemAt, Ignored: m.Ignored, IgnoredAt: m.IgnoredAt, IgnoredBy: m.IgnoredBy, IgnoreCause: m.IgnoreCause, IgnoreReason: m.IgnoreReason, IgnoreIncidentCount: len(m.IgnoreIncidents), ObservedGeneration: m.ownerObserved.generation, ID: m.ID, CatalogUID: m.CatalogUID, CatalogRevision: m.CatalogRevision, Revision: m.Revision, ControlRevision: m.ControlRevision, IncidentID: m.IncidentID, IncidentRevision: m.IncidentRevision, SnoozedUntil: m.SnoozedUntil, LastCheck: m.LastCheck, LastSuccess: m.LastSuccess, NextCheck: m.NextCheck, Enabled: m.Policy.Enabled, Removed: m.Removed, Incident: m.Incident, Recovering: m.Recovering, Warning: m.Warning, LatencyAvailable: m.LatencyAvailable, Generation: m.Generation, TotalChecks: m.TotalChecks, SuccessfulChecks: m.SuccessfulChecks, LastOutcome: m.LastOutcome, LastFailure: m.LastFailure, LastLatency: m.LastLatency, UnknownActions: m.unknownActions, ActionsNeedingReview: m.heldActions}
 }
 func (f *machine) emptyControlIndexes() {
 	f.incidents = btree.NewG(32, func(a, b IncidentRecord) bool { return a.ID < b.ID })
 	f.incidentsByMonitor = btree.NewG(32, func(a, b IncidentRecord) bool { return a.MonitorID < b.MonitorID })
+	f.incidentsByTriage = btree.NewG(32, incidentTriageLess)
 	f.controls = btree.NewG(32, func(a, b ControlChange) bool { return a.MonitorID < b.MonitorID })
 }
 func (f *machine) indexMonitor(m Monitor) {
@@ -57,6 +58,7 @@ func (f *machine) indexMonitor(m Monitor) {
 		r := incidentOf(m)
 		f.incidents.ReplaceOrInsert(r)
 		f.incidentsByMonitor.ReplaceOrInsert(r)
+		f.incidentsByTriage.ReplaceOrInsert(r)
 	}
 	if m.IncidentID != "" || !m.SnoozedUntil.IsZero() || m.ControlRevision != identity("control/"+m.ID+"/"+m.incarnationIdentity()) || f.hasWorkerCheckState(m) {
 		f.controls.ReplaceOrInsert(changeOf(m))
@@ -68,9 +70,11 @@ func (f *machine) rebuildControlIndexes() {
 
 func (f *machine) rebuildControlIndexesContext(ctx context.Context) (err error) {
 	f.emptyControlIndexes()
+	f.recoveryPrograms = recoveryProgramCache{}
 	defer func() {
 		if err != nil {
 			f.incidents, f.incidentsByMonitor, f.controls = nil, nil, nil
+			f.incidentsByTriage = nil
 		}
 	}()
 	for id, m := range f.image.Monitors {
@@ -78,6 +82,7 @@ func (f *machine) rebuildControlIndexesContext(ctx context.Context) (err error) 
 			return err
 		}
 		m.ensureControlIdentity()
+		m.Policy.RecoveryRules = f.recoveryPrograms.replace(RecoveryRules{}, m.Policy.RecoveryRules)
 		m.unknownActions, m.heldActions = 0, 0
 		if m.ActionProjection != nil {
 			m.unknownActions, m.heldActions = m.ActionProjection.Unknown, m.ActionProjection.Held
@@ -157,6 +162,7 @@ func (f *machine) installMonitor(previous, m Monitor, at time.Time) []Event {
 			m.unknownActions++
 		}
 	}
+	m.Policy.RecoveryRules = f.recoveryPrograms.replace(previous.Policy.RecoveryRules, m.Policy.RecoveryRules)
 	f.image.Monitors[m.ID] = m
 	f.updateActionIndexes(previous, m)
 	events = append(events, f.supersedeActionReceipts(previous, at)...)
@@ -165,10 +171,12 @@ func (f *machine) installMonitor(previous, m Monitor, at time.Time) []Event {
 		if previous.IncidentID != "" {
 			f.incidents.Delete(IncidentRecord{ID: previous.IncidentID})
 			f.incidentsByMonitor.Delete(IncidentRecord{MonitorID: previous.ID})
+			f.incidentsByTriage.Delete(oldIncident)
 		}
 		if m.IncidentID != "" {
 			f.incidents.ReplaceOrInsert(newIncident)
 			f.incidentsByMonitor.ReplaceOrInsert(newIncident)
+			f.incidentsByTriage.ReplaceOrInsert(newIncident)
 		}
 	}
 	if changeOf(previous) != changeOf(m) || oldIncident.Active != newIncident.Active {
@@ -239,6 +247,7 @@ func (s *Store) MonitorStatusContext(ctx context.Context, id string) (MonitorSta
 // IncidentView owns an immutable generation. A view can be shared by readers.
 type IncidentView struct {
 	tree, byMonitor *btree.BTreeG[IncidentRecord]
+	triage          *btree.BTreeG[IncidentRecord]
 	Index           uint64
 }
 
@@ -261,7 +270,7 @@ func (s *Store) IncidentSnapshotContext(ctx context.Context) (IncidentView, erro
 	if err := ctx.Err(); err != nil {
 		return IncidentView{}, err
 	}
-	return IncidentView{tree: f.incidents.Clone(), byMonitor: f.incidentsByMonitor.Clone(), Index: f.image.Index}, nil
+	return IncidentView{tree: f.incidents.Clone(), byMonitor: f.incidentsByMonitor.Clone(), triage: f.incidentsByTriage.Clone(), Index: f.image.Index}, nil
 }
 func (v IncidentView) Get(id string) (IncidentRecord, bool) {
 	if v.tree == nil {

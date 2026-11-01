@@ -36,3 +36,15 @@ manual_recovery:
 # Static validation checks these boundaries; startup verifies native ownership.
 # notifications:
 #   log_directory: /var/log/cpra/notifications
+#   concurrency:
+#     webhook: 4 # Independent sequences; supported range is 1–16.
+#     email: 1   # Other drivers default to one per destination.
+#   pacing:
+#     webhook:
+#       minimum_interval: 1s
+#       shared_scope: operations-account # Add a quota shared by these endpoints.
+# Shared pacing and provider scopes can reduce effective concurrency. This
+# example's webhook interval serializes that shared scope; omit it when no
+# documented account quota requires it. Discord and Opsgenie provider scopes
+# remain serial; Slack enforces at least one second between requests. Pacing
+# never authorizes replay of an uncertain action.

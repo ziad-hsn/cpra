@@ -21,6 +21,7 @@ jobs:
     env:
       GOTOOLCHAIN: local
     strategy:
+      fail-fast: false
       matrix:
         go: ['1.26.10', '1.27.3']
     steps:
@@ -75,6 +76,7 @@ jobs:
       GOTOOLCHAIN: local
       GOENV: 'off'
     strategy:
+      fail-fast: false
       matrix:
         go: ['1.26.10', '1.27.3']
     steps:

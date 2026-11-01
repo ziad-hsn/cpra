@@ -2,6 +2,7 @@
 /dist/
 /dashboard/dist/
 node_modules/
+/dashboard/node_modules
 __pycache__/
 coverage/
 *.out
@@ -10,6 +11,7 @@ coverage/
 *.log
 *.jsonl
 !docs/sdk/source/**/*.jsonl
+!examples/sdk/queue-registration/registrations.jsonl
 .env
 .env.*
 /monitors.yaml

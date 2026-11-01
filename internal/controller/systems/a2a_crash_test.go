@@ -20,6 +20,7 @@ import (
 type agentCrashBoundary struct {
 	MonitorID, Revision, ActionID, Stage string
 	QueuedAt, Deadline                   time.Time
+	ExecutionBudget                      time.Duration
 }
 
 func TestA2AControllerCrashProcess(t *testing.T) {
@@ -31,10 +32,10 @@ func TestA2AControllerCrashProcess(t *testing.T) {
 	boundary := func() {
 		m, ok := monitorWithActionHistory(t, s.store, dispatch.MonitorID)
 		a := m.Actions[dispatch.ActionID]
-		if !ok || a.QueuedAt.IsZero() || a.Deadline.IsZero() {
+		if !ok || a.QueuedAt.IsZero() || a.ExecutionBudget <= 0 || stage != "before-admission" && a.Deadline.IsZero() || stage == "before-admission" && !a.Deadline.IsZero() {
 			t.Fatal("crash boundary lost original action budget")
 		}
-		data, err := json.Marshal(agentCrashBoundary{MonitorID: dispatch.MonitorID, Revision: dispatch.Revision, ActionID: dispatch.ActionID, Stage: stage, QueuedAt: a.QueuedAt, Deadline: a.Deadline})
+		data, err := json.Marshal(agentCrashBoundary{MonitorID: dispatch.MonitorID, Revision: dispatch.Revision, ActionID: dispatch.ActionID, Stage: stage, QueuedAt: a.QueuedAt, Deadline: a.Deadline, ExecutionBudget: a.ExecutionBudget})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -182,7 +183,7 @@ func TestA2AControllerProcessCrashRecovery(t *testing.T) {
 			if !ok || a.State != wantState || a.Revision != boundary.Revision || sends.Load() != wantSends {
 				t.Fatal("restart changed original action or sent another message", a, sends.Load())
 			}
-			if !a.QueuedAt.Equal(boundary.QueuedAt) || !a.Deadline.Equal(boundary.Deadline) {
+			if !a.QueuedAt.Equal(boundary.QueuedAt) || !a.Deadline.Equal(boundary.Deadline) || a.ExecutionBudget != boundary.ExecutionBudget {
 				t.Fatal("restart changed the original action deadline")
 			}
 			wantReceipt := stage == "after-receipt" || stage == "before-result" || stage == "after-result"
@@ -218,7 +219,7 @@ func TestA2AControllerProcessCrashRecovery(t *testing.T) {
 				current, _ = monitorWithActionHistory(t, resumed.store, boundary.MonitorID)
 				action = current.Actions[boundary.ActionID]
 				if action.ID != boundary.ActionID || action.State != persistence.Succeeded ||
-					!action.QueuedAt.Equal(boundary.QueuedAt) || !action.Deadline.Equal(boundary.Deadline) {
+					!action.QueuedAt.Equal(boundary.QueuedAt) || !action.Deadline.Equal(action.StartedAt.Add(boundary.ExecutionBudget)) || action.ExecutionBudget != boundary.ExecutionBudget {
 					t.Fatal("execution or result commit changed the original action budget")
 				}
 			}

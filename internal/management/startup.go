@@ -452,10 +452,10 @@ func (o CatalogOptions) startupCapabilities(resource api.Resource) error {
 		if err := check("check", spec.Check.Driver.Type); err != nil {
 			return err
 		}
-		if spec.Recovery != nil {
-			if err := check("recovery", spec.Recovery.Driver.Type); err != nil {
-				return err
-			}
+		if err := api.VisitRecoveryDrivers(spec.Recovery, func(_ string, driver *api.DriverConfig) error {
+			return check("recovery", driver.Type)
+		}); err != nil {
+			return err
 		}
 		if spec.Notifications != nil {
 			for _, code := range *spec.Notifications {

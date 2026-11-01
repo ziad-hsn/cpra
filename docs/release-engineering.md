@@ -1078,9 +1078,9 @@ Qualification must exercise both Helm 3 and 4, including a 3-to-4 upgrade. The r
 
 Before replacement: validate the candidate, stop admission and the owner, take a complete stopped backup, replace the artifact, start against the same directory, and verify recovery. The backup includes node identity, Raft database, snapshots, history catalog and retained segments, and the complete Store-owned generations with their catalog, recovery progress and retained-action ledger. Keep matching configuration/artifact identity and credentials under the separate documented backup procedure. Rollback requires storage-format compatibility and does not undo committed data or external interventions.
 
-Default builds support application storage formats **1–14, 31, 33, 35, 38, 40, 42, 44 and 46**. The
+Default builds support application storage formats **1–14, 31, 33, 35, 38, 40, 42, 44, 46 and 48**. The
 private `externaljobs` build additionally supports worker formats **15–30, 32,
-34, 36, 37, 39, 41, 43, 45 and 47**. [A2A driver settings](reference/jobs-reference.md) use common format
+34, 36, 37, 39, 41, 43, 45, 47 and 49**. [A2A driver settings](reference/jobs-reference.md) use common format
 31, recovery-failure notifications use 33, and retained agent connections use
 35. Combining those features with optional worker state requires formats 32,
 34 and 36 respectively; committed-order worker assignment uses 37. State-change
@@ -1093,7 +1093,9 @@ worker format 43. Retained actions, review assertions and blue-notification
 assessments use the indexed ledger in common format 44 and combined worker
 format 45. Pending notification conditions, first-start budgets, explicit older
 delivery bindings and committed action retirement use format 46, or 47 with
-worker state. See [persistence and recovery](durability.md) for migration and
+worker state. Typed check failures, intervention-rule qualification and selected
+action bindings use format 48, or 49 with worker state. See
+[persistence and recovery](durability.md) for migration and
 complete stopped-backup requirements. Supported historical envelopes
 retain their original notification semantics. The higher
 common formats do not make worker formats readable by default builds. The

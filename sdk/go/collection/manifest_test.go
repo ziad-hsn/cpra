@@ -22,7 +22,7 @@ func TestAll35ManifestDriverVariants(t *testing.T) {
 		{"notification", "a2a", `{"url":"https://agent.example.test","request_timeout":2000000000,"timeout":"3s","allow_insecure_http":false}`, "requestTimeout", "2s"},
 		{"check", "http", `{"url":"https://example.test","expected_status":[200,204],"insecure_skip_verify":false,"headers":{"X_Trace_ID":"keep"}}`, "insecureSkipVerify", false},
 		{"check", "tcp", `{"host":"db.internal","port":5432}`, "port", float64(5432)},
-		{"check", "icmp", `{"host":"router","ignore_privilege":false}`, "ignorePrivilege", false},
+		{"check", "icmp", `{"host":"router","Privilege":false}`, "ignorePrivilege", false},
 		{"check", "dns", `{"host":"api.internal","server":"10.0.0.53:53"}`, "server", "10.0.0.53:53"},
 		{"check", "udp", `{"host":"dns.internal","port":53,"payload":"ping"}`, "payload", "ping"},
 		{"check", "grpc", `{"host":"grpc.internal","port":443,"service":"health"}`, "service", "health"},

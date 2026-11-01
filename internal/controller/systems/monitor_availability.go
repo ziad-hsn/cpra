@@ -2,13 +2,33 @@ package systems
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/mlange-42/ark/ecs"
+	"github.com/ziad-hsn/cpra/internal/controller/components"
 	"github.com/ziad-hsn/cpra/internal/fleetview"
 	"github.com/ziad-hsn/cpra/internal/manifest"
 	"github.com/ziad-hsn/cpra/internal/persistence"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
+
+// A preparation problem belongs to one unsent selection, not to the monitor's
+// entire lifetime. Successful checks and superseding decisions can retire it.
+// This is called only by the ECS owner and never reads historical actions.
+func interventionPreparationProblem(js *components.JobStorage, m persistence.Monitor) bool {
+	if js == nil || js.InterventionPreparationAction == "" {
+		return false
+	}
+	a, ok := m.Actions[js.InterventionPreparationAction]
+	if ok && a.State == persistence.Queued && a.Kind == "intervention" && m.OwnsAction(a) && m.ActionConfigurationCurrent(a) &&
+		a.Rule != (persistence.RecoverySelection{}) && js.InterventionRuleBinding != a.Rule.Target.Binding {
+		return true
+	}
+	js.InterventionPreparationAction = ""
+	js.InterventionPreparationRetry = time.Time{}
+	return false
+}
 
 // projectAvailability runs only on the owner. It preserves the last target
 // result while making local preparation failure explicit to older health readers.
@@ -35,8 +55,11 @@ func (s *DurableSystem) projectAvailability(ent ecs.Entity, m persistence.Monito
 	summary.Maintenance = m.Policy.InMaintenance(at) || manifest.InMaintenance(state.Maintenance, at)
 	summary.NotificationsSuppressed = !m.Policy.Enabled || !m.SnoozedUntil.IsZero() || m.Ignored || m.Dismissed || summary.Maintenance
 	summary.SuppressionObservedAt = at
-	if m.Policy.Intervention && m.Policy.Endpoints["blue"] == 0 {
+	if m.Policy.Intervention && (m.Policy.RecoveryRules.IsZero() || m.Policy.RecoveryRules.HasIntervention()) && m.Policy.Endpoints["blue"] == 0 {
 		summary.ConfigurationWarnings = []string{"unknownRecoveryDestination"}
+	}
+	if !m.Policy.RecoveryRules.IsZero() && m.Policy.Endpoints["red"] > 0 && (m.Policy.NotificationTriggers["red"] == persistence.NotifyRecoveryFailed || m.Policy.NotificationTriggers["red"] == persistence.NotifyRecoveryExhausted) {
+		summary.ConfigurationWarnings = append(summary.ConfigurationWarnings, "recoveryOnlyCoverage")
 	}
 	conditions, truncated := m.NotificationConditions()
 	summary.NotificationConditionsTruncated = truncated
@@ -63,7 +86,7 @@ func (s *DurableSystem) logConfigurationWarning(summary fleetview.MonitorSummary
 	}
 	warn := len(summary.ConfigurationWarnings) != 0
 	if s.index != nil {
-		if previous, ok := s.index.Get(summary.ID); ok && previous.IncarnationUID == summary.IncarnationUID && (len(previous.ConfigurationWarnings) != 0) == warn {
+		if previous, ok := s.index.Get(summary.ID); ok && previous.IncarnationUID == summary.IncarnationUID && slices.Equal(previous.ConfigurationWarnings, summary.ConfigurationWarnings) {
 			return
 		}
 	}
@@ -73,13 +96,15 @@ func (s *DurableSystem) logConfigurationWarning(summary fleetview.MonitorSummary
 	if at.Sub(s.warningLogWindow) >= time.Minute || at.Before(s.warningLogWindow) {
 		s.warningLogWindow, s.warningLogs = at, 0
 	}
-	if s.warningLogs < 10 {
-		s.logger.Warn("Uncertain recovery has no enabled blue notification destination", "monitor_id", summary.MonitorID, "monitor_uid", summary.IncarnationUID, "configuration_revision", summary.ConfigurationRevision, "warning_code", "unknownRecoveryDestination")
-	} else if s.warningLogs == 10 {
-		s.logger.Warn("Additional configuration warning transitions omitted from logs; inspect monitor status", "warning_code", "configuration_warnings_truncated")
-	}
-	if s.warningLogs <= 10 {
-		s.warningLogs++
+	for _, reason := range summary.ConfigurationWarnings {
+		if s.warningLogs < 10 {
+			s.logger.Warn(api.ValidationMessage(reason), "monitor_id", summary.MonitorID, "monitor_uid", summary.IncarnationUID, "configuration_revision", summary.ConfigurationRevision, "warning_code", reason)
+		} else if s.warningLogs == 10 {
+			s.logger.Warn("Additional configuration warning transitions omitted from logs; inspect monitor status", "warning_code", "configuration_warnings_truncated")
+		}
+		if s.warningLogs <= 10 {
+			s.warningLogs++
+		}
 	}
 }
 

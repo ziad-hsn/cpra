@@ -143,6 +143,7 @@ func queueWorkerHTTPActionSource(t *testing.T, f *workerSessionFixture, category
 			in.ActionID = action.ID
 			in.Scheduled = action.NotBefore
 			in.Deadline = action.Deadline
+			in.ExecutionBudget = action.ExecutionBudget
 			break
 		}
 	}

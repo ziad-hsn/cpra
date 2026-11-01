@@ -136,8 +136,8 @@ func (m *managementHTTP) beginSnapshotRead(ctx context.Context, kind string, que
 		if !ok || cursorExpired(entry) || entry.principal != principal || entry.generation != generation || entry.kind != kind {
 			return nil, managementFailure(410, "cursorExpired", "The cursor expired or belongs to another access context.")
 		}
-		if (limit != 0 && limit != entry.limit) || query.Get("monitorID") != entry.monitorID {
-			return nil, managementFailure(400, "cursorMismatch", "Continue with the original page limit and monitor selection.")
+		if (limit != 0 && limit != entry.limit) || query.Get("monitorID") != entry.monitorID || incidentQueryIdentity(kind, query) != entry.incidentQuery {
+			return nil, managementFailure(400, "cursorMismatch", "Continue with the original page limit, filters and ordering.")
 		}
 		if now.Before(entry.created) {
 			return nil, management.ErrUnavailable
@@ -160,6 +160,7 @@ func (m *managementHTTP) beginSnapshotRead(ctx context.Context, kind string, que
 	read.fresh = true
 	read.cursor.View = uuid.NewString()
 	read.entry = managementSnapshot{activity: &cursorActivity{readers: 1, lastUsed: now}, monitorID: query.Get("monitorID"), principal: principal, generation: generation, kind: kind, limit: limit, created: now, expires: now.Add(managementCursorTTL)}
+	read.entry.incidentQuery = incidentQueryIdentity(kind, query)
 	for attempts := 0; ; attempts++ {
 		extension, err := m.reserveSnapshotExtension(kind, principal)
 		if err == nil {
@@ -401,7 +402,7 @@ func (m *managementHTTP) retireSnapshot(id string, entry managementSnapshot) {
 	delete(m.snapshots, id)
 }
 
-// Capacity reclamation prefers completed views, then views idle for 30 seconds.
+// Capacity reclamation prefers completed views, then least-recently-used views.
 // It never interrupts an admitted reader, extends the original TTL or closes a
 // storage pin while metadata is locked. Evicted cursor tokens return 410.
 func (m *managementHTTP) reclaimSnapshot(principal string, now time.Time) bool {
@@ -415,9 +416,6 @@ func (m *managementHTTP) reclaimSnapshotMatching(principal string, now time.Time
 	for id, entry := range m.snapshots {
 		a := entry.activity
 		if principal != "" && entry.principal != principal || a == nil || a.readers != 0 || now.Before(a.lastUsed) || eligible != nil && !eligible(entry) {
-			continue
-		}
-		if !a.completed && now.Sub(a.lastUsed) < managementCursorIdle {
 			continue
 		}
 		if selected == "" || a.completed && !completed || a.completed == completed && (a.lastUsed.Before(oldest) || a.lastUsed.Equal(oldest) && id < selected) {

@@ -41,7 +41,8 @@ it('shows actual queue saturation and distinguishes observed waits from oldest q
   expect(within(region).queryByText('Service rate')).not.toBeInTheDocument();
   expect(region).toHaveTextContent('0.000');
   expect(within(region).getByText('Oldest queued work').parentElement).toHaveTextContent('Not reported');
-  expect(region).toHaveTextContent('not the age of work still waiting');
+  expect(region).toHaveTextContent('Observed waits describe dequeued work');
+  expect(region).toHaveTextContent('Oldest queued work excludes work already removed for execution');
 });
 
 it('does not fabricate saturation or timing evidence for an unconfigured queue', () => {

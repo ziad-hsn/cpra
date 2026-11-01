@@ -94,6 +94,7 @@ func inputPosition(ctx context.Context, filename string, offset int64) (int, int
 }
 
 var fieldParts = regexp.MustCompile(`[^.\[\]]+`)
+var ruleDriverPath = regexp.MustCompile(`(intervention\.rules\[[0-9]+\])\.driver\.(config|type)`)
 
 func fieldKey(s string) string { return strings.ToLower(strings.ReplaceAll(s, "_", "")) }
 
@@ -105,7 +106,46 @@ func diagnosticPath(cause error) []string {
 		return nil
 	}
 	field := strings.ReplaceAll(detail.Field, "intervention.config", "intervention.target")
+	field = ruleDriverPath.ReplaceAllStringFunc(field, func(value string) string {
+		if strings.HasSuffix(value, ".config") {
+			return strings.TrimSuffix(value, ".driver.config") + ".target"
+		}
+		return strings.TrimSuffix(value, ".driver.type") + ".action"
+	})
 	return fieldParts.FindAllString(field, -1)
+}
+
+// sourceFieldError changes presentation only. The underlying typed diagnostic
+// retains its canonical path for API adapters and programmatic inspection.
+type sourceFieldError struct {
+	field string
+	cause error
+}
+
+func (e sourceFieldError) Error() string {
+	detail, _ := api.ValidationFieldError(e.cause)
+	return e.field + ": " + detail.Message
+}
+func (e sourceFieldError) Unwrap() error { return e.cause }
+func sourceFieldCause(parts []string, cause error) error {
+	if _, ok := api.ValidationFieldError(cause); !ok {
+		return cause
+	}
+	var field strings.Builder
+	for _, part := range parts {
+		if _, err := strconv.Atoi(part); err == nil {
+			field.WriteString("[" + part + "]")
+		} else {
+			if field.Len() > 0 {
+				field.WriteByte('.')
+			}
+			field.WriteString(part)
+		}
+	}
+	if safe := api.SafeValidationField(field.String()); safe != "" {
+		return sourceFieldError{safe, cause}
+	}
+	return cause
 }
 
 func yamlDiagnosticNode(node *yaml.Node, parts []string, depth int) *yaml.Node {
@@ -148,6 +188,9 @@ func yamlDiagnosticNode(node *yaml.Node, parts []string, depth int) *yaml.Node {
 		} else {
 			for i := 0; i < len(entries); i += 2 {
 				if fieldKey(entries[i].Value) == fieldKey(parts[0]) {
+					if api.SafeValidationField(entries[i].Value) != "" {
+						parts[0] = entries[i].Value
+					}
 					return yamlDiagnosticNode(entries[i+1], parts[1:], depth+1)
 				}
 			}
@@ -158,12 +201,13 @@ func yamlDiagnosticNode(node *yaml.Node, parts []string, depth int) *yaml.Node {
 }
 
 func yamlSourceError(ctx context.Context, filename string, item int, node *yaml.Node, cause error) error {
-	point := yamlDiagnosticNode(node, diagnosticPath(cause), 0)
+	parts := diagnosticPath(cause)
+	point := yamlDiagnosticNode(node, parts, 0)
 	source := MonitorSource{Item: item, Offset: -1}
 	if point != nil {
 		source.Line, source.Column = point.Line, point.Column
 	}
-	return source.Error(ctx, filename, cause)
+	return source.Error(ctx, filename, sourceFieldCause(parts, cause))
 }
 
 // YAML map decoding does not prefix errors returned by custom element
@@ -273,6 +317,9 @@ func jsonFieldOffset(raw []byte, parts []string, depth int) int64 {
 				return 0
 			}
 			matches = indexErr == nil && value == selectedKey || indexErr != nil && fieldKey(value) == fieldKey(parts[0])
+			if matches && indexErr != nil && api.SafeValidationField(value) != "" {
+				parts[0] = value
+			}
 		}
 		var child json.RawMessage
 		if decoder.Decode(&child) != nil {
@@ -301,5 +348,5 @@ func jsonFieldSourceError(ctx context.Context, filename string, item int, raw []
 		}
 	}
 	var cursor *jsonCursorError
-	return (MonitorSource{Item: item, Offset: max(0, start+position), ParserContext: errors.As(cause, &cursor)}).Error(ctx, filename, cause)
+	return (MonitorSource{Item: item, Offset: max(0, start+position), ParserContext: errors.As(cause, &cursor)}).Error(ctx, filename, sourceFieldCause(parts, cause))
 }

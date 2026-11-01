@@ -13,11 +13,21 @@ func TestDigestV1ProjectionCoversEveryLegacyField(t *testing.T) {
 	var command Command
 	c := reflect.ValueOf(&command).Elem()
 	frozen := reflect.TypeFor[operationCommandDigestV1]()
-	if c.NumField() != frozen.NumField()+10 {
+	if c.NumField() != frozen.NumField()+12 {
 		t.Fatal("Command gained a field without a reviewed legacy projection")
 	}
 	for n := 0; n < c.NumField(); n++ {
 		field := c.Type().Field(n)
+		if field.Name == "NotificationPermit" || field.Name == "NotificationFeedback" {
+			want, tag := reflect.TypeFor[*NotificationPermit](), "notification_permit,omitempty"
+			if field.Name == "NotificationFeedback" {
+				want, tag = reflect.TypeFor[*NotificationFeedback](), "notification_feedback,omitempty"
+			}
+			if field.Type != want || field.Tag.Get("json") != tag {
+				t.Fatal("unreviewed pacing contract")
+			}
+			continue
+		}
 		if field.Name == "ActionRetirement" {
 			if field.Type != reflect.TypeFor[*ActionRetirementCommand]() || field.Tag.Get("json") != "action_retirement,omitempty" {
 				t.Fatal("unreviewed action retirement shape")
@@ -85,7 +95,7 @@ func TestDigestV1ProjectionCoversEveryLegacyField(t *testing.T) {
 			continue
 		}
 		original, ok := frozen.FieldByName(field.Name)
-		if !ok || original.Type != field.Type && field.Name != "Catalog" || original.Tag != field.Tag {
+		if !ok || original.Type != field.Type && field.Name != "Catalog" && field.Name != "ManualRecovery" || original.Tag != field.Tag {
 			t.Fatalf("legacy field changed: %s", field.Name)
 		}
 		v := c.Field(n)
@@ -150,6 +160,8 @@ func TestOperationDigestRejectsExecutionOnlyFields(t *testing.T) {
 		name string
 		set  func(*Command)
 	}{
+		{"notification permit", func(c *Command) { c.NotificationPermit = &NotificationPermit{} }},
+		{"notification feedback", func(c *Command) { c.NotificationFeedback = &NotificationFeedback{} }},
 		{"failure", func(c *Command) { c.Failure = NewFailureDiagnostic("dns_failed") }},
 		{"retry delay", func(c *Command) { c.RetryDelay = time.Second }},
 		{"action deadline", func(c *Command) { c.ActionDeadline = c.At.Add(time.Minute) }},

@@ -4,6 +4,7 @@ package worker
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -17,6 +18,7 @@ func validText(text string, limit int) bool {
 
 func cloneAssignment(a api.Assignment) api.Assignment {
 	a.Parameters = append([]byte(nil), a.Parameters...)
+	a.FailureCodes = append([]string(nil), a.FailureCodes...)
 	if a.Notification != nil {
 		n := *a.Notification
 		if n.Resolution != nil {
@@ -46,6 +48,9 @@ func validEvidence(diagnostic string, evidence []string) bool {
 }
 
 func validateAssignment(a api.Assignment, server, worker, session string) error {
+	if api.ValidateJobTypeFailures(api.JobTypeSpec{Kind: a.Kind, ProtocolVersion: workerProtocol(a.ProtocolVersion), FailureCodes: a.FailureCodes}) != nil {
+		return ErrIdentity
+	}
 	if a.ServerID != server || a.WorkerUID != worker || a.SessionID != session || !validKind(a.Kind) || !validDeadline(a.Deadline) {
 		return ErrIdentity
 	}
@@ -112,7 +117,7 @@ func validateBatch(batch *api.Assignments, request api.PollRequest, uid string, 
 		leases[a.LeaseID] = true
 		registered := false
 		for _, c := range request.Capabilities {
-			if c.JobTypeID == a.JobTypeID && c.Version == a.JobTypeVersion && c.Kind == a.Kind {
+			if c.JobTypeID == a.JobTypeID && c.Version == a.JobTypeVersion && c.Kind == a.Kind && workerProtocol(c.ProtocolVersion) == workerProtocol(a.ProtocolVersion) {
 				registered = true
 				break
 			}
@@ -126,6 +131,52 @@ func validateBatch(batch *api.Assignments, request api.PollRequest, uid string, 
 		return ErrIdentity
 	}
 	return nil
+}
+
+func workerProtocol(version string) string {
+	if version == "" {
+		return "1"
+	}
+	return version
+}
+
+func (r *Registry) validateContracts(assignments []api.Assignment) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, a := range assignments {
+		codes, structured := r.failures[handlerKey{a.JobTypeID, a.JobTypeVersion, a.Kind}]
+		if (workerProtocol(a.ProtocolVersion) == "2") != structured {
+			return ErrIdentity
+		}
+		if structured {
+			x, y := slices.Clone(codes), slices.Clone(a.FailureCodes)
+			slices.Sort(x)
+			slices.Sort(y)
+			if !slices.Equal(x, y) {
+				return ErrIdentity
+			}
+		}
+	}
+	return nil
+}
+
+func recordFailureValid(rec journalRecord, out api.Outcome) bool {
+	if out.Failure == nil {
+		return true
+	}
+	if rec.ProtocolVersion != "2" || rec.Kind != "check" || out.Status != "failure" && out.Status != "noData" {
+		return false
+	}
+	failure, err := api.CanonicalWorkerFailure(api.ExternalFailureContract{JobTypeID: rec.JobTypeID, JobTypeUID: rec.JobTypeUID, Version: rec.JobTypeVersion, ProtocolVersion: rec.ProtocolVersion, Codes: rec.FailureCodes}, *out.Failure)
+	if err != nil {
+		return false
+	}
+	definition, known := api.FailureCodeDefinition(api.FailureTaxonomyVersion, failure.Code)
+	unavailable := known && !definition.Available
+	if (failure.Code == "grpc_health_failed" || failure.Code == "grpc.rpc_failed") && failure.GRPCCode != nil && *failure.GRPCCode == "Canceled" {
+		unavailable = true
+	}
+	return (out.Status == "noData") == unavailable
 }
 
 func validateStart(reply *api.StartResponse, request api.StartRequest, workerUID string) error {

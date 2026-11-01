@@ -22,7 +22,7 @@ const (
 	// resolution, routing, prefix ordering or allocation/work accounting change
 	// accepted configurations or validation decisions. Schema and limit changes
 	// are also hashed, but cannot identify arbitrary Go implementation changes.
-	collectionValidationPolicyVersion = 6
+	collectionValidationPolicyVersion = 7
 	collectionProfileSchemaBytes      = 1 << 20
 	collectionProfileEncodedBytes     = 64 << 10
 	collectionProfileDriverCount      = 64

@@ -48,7 +48,9 @@ func TestControllerHoldsContradictoryOpsgenieReceipt(t *testing.T) {
 			}
 			system.Initialize(&world)
 			state := *system.states.Get(ent)
-			failed := jobs.Result{Ent: ent, Type: "pulse", MonitorID: state.MonitorID, Revision: state.Revision, Generation: 1, Err: jobs.ErrJobPanic}
+			// A target observation opens an outage. A local panic is monitoring
+			// unavailability and cannot manufacture a target incident.
+			failed := jobs.Result{Ent: ent, Type: "pulse", MonitorID: state.MonitorID, Revision: state.Revision, Generation: 1, Err: &jobs.HTTPStatusError{Status: 503}}
 			if !system.commitResults([]jobs.Result{failed}) {
 				t.Fatal("check result was not committed", system.lastError)
 			}

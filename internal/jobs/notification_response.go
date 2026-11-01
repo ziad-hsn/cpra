@@ -107,6 +107,7 @@ func notificationResponseError(provider string, response *http.Response) (err er
 			ErrorCode  *int     `json:"error_code,omitempty"`
 			Code       *int     `json:"code,omitempty"`
 			RetryAfter *float64 `json:"retry_after,omitempty"`
+			Global     *bool    `json:"global,omitempty"`
 			Parameters struct {
 				RetryAfter *int64 `json:"retry_after,omitempty"`
 			} `json:"parameters,omitempty"`
@@ -146,6 +147,7 @@ func notificationResponseError(provider string, response *http.Response) (err er
 				if valid {
 					delay = max(delay, header)
 				}
+				observeNotificationPause(response, delay, result.Global != nil && *result.Global)
 				return &DeliveryError{Status: status, Retryable: true, RetryAfter: delay}
 			}
 			if result.Code != nil && (status == 400 || status == 401 || status == 403 || status == 404) {
@@ -170,7 +172,7 @@ func decodeNotificationResponse(raw []byte, out any) error {
 	}
 	// encoding/json binds struct fields case-insensitively. These providers use
 	// exact wire names; aliases must not overwrite outcome or retry evidence.
-	if !notificationExactKeys(fields, "ok", "status", "error_code", "code", "retry_after", "parameters") {
+	if !notificationExactKeys(fields, "ok", "status", "error_code", "code", "retry_after", "parameters", "global") {
 		return fmt.Errorf("notification response has ambiguous fields")
 	}
 	if parameters, exists := fields["parameters"]; exists {

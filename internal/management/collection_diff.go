@@ -13,6 +13,9 @@ import (
 // preflight. Values never leave this comparison. Free-form objects and arrays
 // are reported at their containing field rather than exposing their keys.
 func collectionChangedFields(old, next api.Resource) []string {
+	old.Spec, next.Spec = comparableSpec(old.Kind, old.Spec), comparableSpec(next.Kind, next.Spec)
+	defer clear(old.Spec)
+	defer clear(next.Spec)
 	fields := make([]string, 0, 16)
 	if !reflect.DeepEqual(old.Metadata.Name, next.Metadata.Name) {
 		fields = append(fields, "metadata.name")

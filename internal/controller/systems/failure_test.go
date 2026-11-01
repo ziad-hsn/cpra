@@ -97,7 +97,7 @@ func TestControllerCommitsSafeFailureBeforeNotification(t *testing.T) {
 		t.Fatal("check result did not commit", system.lastError)
 	}
 	m, ok := monitorWithActionHistory(t, store, state.MonitorID)
-	if !ok || m.LastFailure != (persistence.FailureDiagnostic{Code: "unexpected_http_status", HTTPStatus: 503}).WithDetails() {
+	if !ok || m.LastFailure.Code != "unexpected_http_status" || m.LastFailure.HTTPStatus != 503 || m.LastFailure.TaxonomyVersion != "1" || m.LastFailure.Phase != "response" {
 		t.Fatal("committed state lost safe cause")
 	}
 	system.dispatchActions(time.Now().UTC())
@@ -206,7 +206,7 @@ func TestNotificationResponseFailureDoesNotDescribeAHealthEndpoint(t *testing.T)
 		t.Fatal("notification result did not commit", system.lastError)
 	}
 	m, ok := monitorWithActionHistory(t, store, state.MonitorID)
-	if !ok || m.LastFailure != (persistence.FailureDiagnostic{Code: "unexpected_http_status", HTTPStatus: 503}).WithDetails() || len(m.Actions) != 1 {
+	if !ok || m.LastFailure.Code != "unexpected_http_status" || m.LastFailure.HTTPStatus != 503 || m.LastFailure.TaxonomyVersion != "1" || m.LastFailure.Phase != "response" || len(m.Actions) != 1 {
 		t.Fatal("notification result changed the health observation")
 	}
 	for _, action := range m.Actions {

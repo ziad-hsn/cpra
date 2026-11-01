@@ -12,7 +12,7 @@ import (
 )
 
 func TestLocalActionsRequireStoppedExistingStore(t *testing.T) {
-	directory := filepath.Join(t.TempDir(), "missing")
+	directory := filepath.Join(backupCollectionRoot(t), "missing")
 	if _, err := ReadStoppedActions(t.Context(), directory, "", "", 100); err == nil {
 		t.Fatal("created missing store")
 	}

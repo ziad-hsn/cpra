@@ -3,6 +3,7 @@ package entities
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/url"
@@ -86,7 +87,7 @@ func actionDestination(driver string, config any) (components.ActionFlow, error)
 	}
 	digest := sha256.Sum256(raw)
 	clear(raw)
-	return components.ActionFlow{Driver: driver, Key: binary.BigEndian.Uint64(digest[:8])}, nil
+	return components.ActionFlow{Driver: driver, Key: binary.BigEndian.Uint64(digest[:8]), Digest: hex.EncodeToString(digest[:])}, nil
 }
 
 func destinationURL(raw string) string {

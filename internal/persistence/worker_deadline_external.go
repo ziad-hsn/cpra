@@ -35,13 +35,14 @@ func workerAssignmentDeadline(in WorkerExecutionIntent, lease *WorkerExecutionLi
 }
 
 // ValidTiming is shared by plaintext preparation and sealed-intent validation.
-// Only a new notification may wait without an absolute execution deadline.
+// New notifications and recoveries may wait without an execution deadline;
+// the committed envelope format and action binding validate their permission.
 func (in WorkerExecutionIntent) ValidTiming() bool {
 	if in.Scheduled.IsZero() || in.Scheduled.Year() < 1 || in.Scheduled.Year() > 9998 {
 		return false
 	}
 	if in.ExecutionBudget != 0 {
-		return in.Category == "notification" && in.ExecutionBudget > 0 && in.ExecutionBudget <= 24*time.Hour && in.Deadline.IsZero()
+		return (in.Category == "notification" || in.Category == "recovery") && in.ExecutionBudget > 0 && in.ExecutionBudget <= 24*time.Hour && in.Deadline.IsZero()
 	}
 	return in.Deadline.After(in.Scheduled) && in.Deadline.Sub(in.Scheduled) <= 24*time.Hour && in.Deadline.Year() <= 9999
 }

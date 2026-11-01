@@ -33,6 +33,18 @@
       "sha256": "6a3c9241c4270c65052fae54e9d95ae4f0fb6b4c9fb89688ae4537de5776e4ae"
     },
     {
+      "asset": "reference/source/examples/intervention-rules/external.yaml.txt",
+      "bytes": 934,
+      "path": "examples/intervention-rules/external.yaml",
+      "sha256": "1f68c68c1fa764722f1a74b19c9ea48c93b5e08270effbb3947ee951197f15a0"
+    },
+    {
+      "asset": "reference/source/examples/intervention-rules/monitor.yaml.txt",
+      "bytes": 1153,
+      "path": "examples/intervention-rules/monitor.yaml",
+      "sha256": "0bd7fec9425841ce3985e1d9830aa449907dcc822fe15bdfd932cdf18404ff6e"
+    },
+    {
       "asset": "reference/source/examples/management/README.md.txt",
       "bytes": 4393,
       "path": "examples/management/README.md",
@@ -70,9 +82,9 @@
     },
     {
       "asset": "reference/source/internal/manifest/manifest.go.txt",
-      "bytes": 29278,
+      "bytes": 30509,
       "path": "internal/manifest/manifest.go",
-      "sha256": "aaf3945d2764a3a6ab1ac99556be18cadb565dd59e13c6fdb1ae3972304f63a8"
+      "sha256": "fa23536b598ea1a9aea60d4ac7ab854c284ca63aabdbf4e371a692789bc3d538"
     },
     {
       "asset": "reference/source/internal/manifest/notification_types_new.go.txt",

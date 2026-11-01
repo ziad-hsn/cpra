@@ -11,6 +11,7 @@ import (
 )
 
 func (a Action) Clone() Action {
+	a.NotificationPermit = a.NotificationPermit.clone()
 	if a.Resolution != nil {
 		n := *a.Resolution
 		a.Resolution = &n

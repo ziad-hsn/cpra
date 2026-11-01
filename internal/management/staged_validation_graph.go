@@ -317,6 +317,9 @@ func (v *stagedValidator) validateSet(ctx context.Context, selected map[persiste
 // Validate resolved drivers without marshalling them back into the borrowed
 // resource. Each resolution/output reservation lasts through its last use only.
 func (v *stagedValidator) validateDriversAndMonitor(ctx context.Context, resource *api.Resource, lookup resourceLookup) error {
+	if err := v.source.catalog.validateRecoveryRuleContract(ctx, *resource); err != nil {
+		return stagedValidationError(err)
+	}
 	driver := func(category string, input api.DriverConfig) error {
 		defer clear(input.Config)
 		if err := v.source.catalog.options.validateDriver(category, input); err != nil {
@@ -354,9 +357,9 @@ func (v *stagedValidator) validateDriversAndMonitor(ctx context.Context, resourc
 			return stagedValidationError(api.PrefixValidationError("spec", err))
 		}
 		defer clear(spec.Check.Driver.Config)
-		if spec.Recovery != nil {
-			defer clear(spec.Recovery.Driver.Config)
-		}
+		defer func() {
+			_ = api.VisitRecoveryDrivers(spec.Recovery, func(_ string, d *api.DriverConfig) error { clear(d.Config); return nil })
+		}()
 		if spec.Notifications != nil {
 			for _, rule := range *spec.Notifications {
 				if rule.Driver != nil {
@@ -367,10 +370,10 @@ func (v *stagedValidator) validateDriversAndMonitor(ctx context.Context, resourc
 		if err := driver("check", spec.Check.Driver); err != nil {
 			return api.PrefixValidationError("spec.check.driver", err)
 		}
-		if spec.Recovery != nil {
-			if err := driver("recovery", spec.Recovery.Driver); err != nil {
-				return api.PrefixValidationError("spec.recovery.driver", err)
-			}
+		if err := api.VisitRecoveryDrivers(spec.Recovery, func(field string, d *api.DriverConfig) error {
+			return api.PrefixValidationError("spec.recovery."+field, driver("recovery", *d))
+		}); err != nil {
+			return err
 		}
 		if spec.Notifications != nil {
 			for _, color := range collectionNotificationColors(*spec.Notifications) {

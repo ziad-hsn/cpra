@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -103,7 +104,7 @@ func (k ExternalRuntimeKey) Validate() error {
 		case "notifications.red", "notifications.yellow", "notifications.green", "notifications.cyan", "notifications.gray", "notifications.blue":
 			valid = valid && k.JobType.Category == "notification"
 		default:
-			valid = false
+			valid = valid && k.JobType.Category == "recovery" && validRecoveryRuleSlot(k.Slot)
 		}
 	case "NotificationEndpoint":
 		valid = valid && k.Slot == "endpoint" && k.JobType.Category == "notification"
@@ -114,6 +115,12 @@ func (k ExternalRuntimeKey) Validate() error {
 		return errors.New("invalid external runtime key")
 	}
 	return nil
+}
+
+func validRecoveryRuleSlot(slot string) bool {
+	value := strings.TrimSuffix(strings.TrimPrefix(slot, "recovery.rules["), "].driver")
+	i, err := strconv.Atoi(value)
+	return err == nil && i >= 0 && i < 32 && slot == fmt.Sprintf("recovery.rules[%d].driver", i)
 }
 func validExternalIdentity(i ExternalJobIdentity) bool {
 	return externalSelector(i.JobTypeID) && externalIdentifier(i.JobTypeUID) && externalSelector(i.Version) && externalIdentifier(i.Revision) && (i.Category == "check" || i.Category == "recovery" || i.Category == "notification")

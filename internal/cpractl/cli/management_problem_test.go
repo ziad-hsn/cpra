@@ -12,6 +12,7 @@ import (
 
 	cpra "github.com/ziad-hsn/cpra/sdk/go"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
+	"github.com/ziad-hsn/cpra/sdk/go/collection"
 )
 
 func TestManagementProblemDetails(t *testing.T) {
@@ -90,7 +91,7 @@ func TestCollectionInputAndPrivateStagingErrorsAreDistinct(t *testing.T) {
 	t.Setenv("TMPDIR", missing)
 	t.Setenv("TMP", missing)
 	t.Setenv("TEMP", missing)
-	for _, profile := range []string{"", "cpra.file.base.v3"} {
+	for _, profile := range []string{"", collection.FileNormalizationProfile} {
 		args := []string{"apply", "-f", "-"}
 		if profile != "" {
 			args = append(args, "--file-profile", profile)

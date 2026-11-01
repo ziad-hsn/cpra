@@ -3,7 +3,9 @@
 package entities
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/mlange-42/ark/ecs"
 	"github.com/ziad-hsn/cpra/internal/controller/components"
@@ -24,6 +26,11 @@ func validateLocalJobPreparation(m manifest.Monitor, endpoints map[string]manife
 	}
 	if _, ok := m.Intervention.Target.(*manifest.ExternalInterventionConfig); ok {
 		return errExternalPreparation
+	}
+	for _, rule := range m.Intervention.Rules {
+		if _, ok := rule.Target.(*manifest.ExternalInterventionConfig); ok {
+			return errExternalPreparation
+		}
 	}
 	for _, code := range m.Codes {
 		if _, ok := code.Config.(*manifest.ExternalNotificationConfig); ok {
@@ -136,6 +143,27 @@ func (p *externalJobPreparer) intervention(config manifest.Intervention) (jobs.J
 	return nil, nil
 }
 
+func (p *externalJobPreparer) rules(config manifest.Intervention) error {
+	for i, rule := range config.Rules {
+		marker, ok := rule.Target.(*manifest.ExternalInterventionConfig)
+		if !ok {
+			continue
+		}
+		if marker == nil || rule.Action != "external" {
+			return errExternalPreparation
+		}
+		binding, err := p.binding(marker.Key, "Monitor", p.monitorID, fmt.Sprintf("recovery.rules[%d].driver", i))
+		if err != nil {
+			return err
+		}
+		if p.storage.RecoveryRules == nil {
+			p.storage.RecoveryRules = make(map[string]*manifest.ExternalRuntimeBinding)
+		}
+		p.storage.RecoveryRules[rule.ID] = binding
+	}
+	return nil
+}
+
 func (p *externalJobPreparer) codes(monitor string, config manifest.CodeConfig, color string, endpoints map[string]manifest.Endpoint, groups manifest.NotificationGroups) ([]jobs.Job, error) {
 	if config.NotifyGroup == "" {
 		job, binding, err := p.notification(monitor, color, config, "Monitor", p.monitorID, "notifications."+color)
@@ -197,4 +225,36 @@ func (p *externalJobPreparer) finish(storage *components.JobStorage) error {
 		storage.ExternalJobs = &p.storage
 	}
 	return nil
+}
+
+// Only immutable job identity and effective descriptor content enter delivery
+// bindings. SourceRevision still belongs to execution grants and their fences.
+func (p *externalJobPreparer) configurationIdentity(config any) ([]byte, error) {
+	var key manifest.ExternalRuntimeKey
+	switch v := config.(type) {
+	case *manifest.ExternalPulseConfig:
+		if v == nil {
+			return nil, errExternalPreparation
+		}
+		key = v.Key
+	case *manifest.ExternalNotificationConfig:
+		if v == nil {
+			return nil, errExternalPreparation
+		}
+		key = v.Key
+	default:
+		return p.localJobPreparer.configurationIdentity(config)
+	}
+	b := p.bindings[key]
+	if b == nil {
+		return nil, errExternalPreparation
+	}
+	key.SourceRevision = ""
+	parameters := b.Descriptor.Parameters()
+	defer clear(parameters)
+	return json.Marshal(struct {
+		Key        manifest.ExternalRuntimeKey
+		Parameters json.RawMessage
+		Profile    string
+	}{key, parameters, b.Descriptor.CredentialProfile()})
 }

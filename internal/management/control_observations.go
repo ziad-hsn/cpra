@@ -57,8 +57,15 @@ func (c *Catalog) Incident(ctx context.Context, id string) (api.Incident, error)
 // IncidentView freezes the ordered latest-incident index. One compact record is
 // retained per monitor; older incident events remain in retained history.
 type IncidentView struct {
-	view  persistence.IncidentView
-	ready func(context.Context) error
+	view   persistence.IncidentView
+	ready  func(context.Context) error
+	filter *persistence.IncidentFilter
+}
+
+// WithFilter binds validated query values to this immutable snapshot.
+func (v IncidentView) WithFilter(filter persistence.IncidentFilter) IncidentView {
+	v.filter = &filter
+	return v
 }
 
 func (c *Catalog) IncidentSnapshot() (IncidentView, error) {
@@ -89,12 +96,19 @@ func (v IncidentView) Page(ctx context.Context, monitorID, after string, limit i
 	if monitorID != "" {
 		items := []api.Incident{}
 		record, ok := v.view.ForMonitor(monitorID)
-		if ok && record.ID > after {
+		if ok && record.ID != after && (v.filter == nil || v.filter.Matches(record)) {
 			items = append(items, incidentView(record))
 		}
 		return items, "", nil
 	}
-	records, next, err := v.view.Page(after, limit)
+	var records []persistence.IncidentRecord
+	var next string
+	var err error
+	if v.filter != nil {
+		records, next, err = v.view.FilteredPage(ctx, after, limit, *v.filter)
+	} else {
+		records, next, err = v.view.Page(after, limit)
+	}
 	if err != nil {
 		return nil, "", err
 	}
@@ -132,7 +146,11 @@ func (c *Catalog) observeResource(ctx context.Context, resource api.Resource, de
 	status := api.MonitorStatus{Health: "unknown", LastCheckLatencyMS: api.Measurement{Available: false, Reason: "configurationPending"}}
 	status.NotificationConditionsTruncated = detail
 	status.Availability = api.MonitorAvailability{State: api.MonitorAvailabilityState("unavailable"), Reason: "controllerUnavailable"}
-	if warnings := api.ResourceWarnings(resource); len(warnings) > 0 {
+	warnings := api.ResourceWarnings(resource)
+	if detail {
+		warnings = c.ConfigurationWarnings(ctx, resource)
+	}
+	if len(warnings) > 0 {
 		status.Warnings = &warnings
 	}
 	current, ok, err := c.store.MonitorStatusContext(ctx, resource.Metadata.ID)
@@ -141,6 +159,8 @@ func (c *Catalog) observeResource(ctx context.Context, resource api.Resource, de
 	}
 	if ok && !current.Removed && current.CatalogUID == resource.Metadata.UID && current.CatalogRevision == resource.Metadata.ResourceVersion {
 		status.ControlRevision = current.ControlRevision
+		status.RecoveryDecision = current.RecoveryDecision
+		status.RecoveryAdmission = current.RecoveryAdmission
 		status.NotificationConditionsTruncated = current.NotificationConditionsTruncated
 		status.NotificationConditions = make([]api.NotificationCondition, 0, len(current.NotificationConditions))
 		for _, condition := range current.NotificationConditions {
@@ -207,8 +227,10 @@ func (c *Catalog) observeResource(ctx context.Context, resource api.Resource, de
 		status.Health = "unknown"
 		if holder := c.observations.Load(); holder != nil && holder.Index() != nil {
 			row, found := holder.Index().GetStable(resource.Metadata.ID)
-			if found && row.IncarnationUID == current.CatalogUID && row.ConfigurationRevision == current.Revision && row.ControlRevision == current.ControlRevision && row.StateGeneration == current.Generation && row.IncidentID == current.IncidentID && row.IncidentRevision == current.IncidentRevision {
+			row = holder.Observation(row)
+			if found && current.ObservedGeneration > 0 && current.ObservedGeneration == uint64(resource.Metadata.Generation) && row.CatalogRevision == resource.Metadata.ResourceVersion && row.IncarnationUID == current.CatalogUID && row.ConfigurationRevision == current.Revision && row.ControlRevision == current.ControlRevision && row.StateGeneration == current.Generation && row.IncidentID == current.IncidentID && row.IncidentRevision == current.IncidentRevision {
 				status.Health = row.Health
+				status.RecoveryDecision, status.RecoveryAdmission = row.RecoveryDecision, row.RecoveryAdmission
 				status.Availability = api.MonitorAvailability{State: api.MonitorAvailabilityState(row.Availability.State), Reason: row.Availability.Reason}
 				if !row.Availability.ObservedAt.IsZero() {
 					at := row.Availability.ObservedAt.UTC()
@@ -254,7 +276,7 @@ func failureView(d persistence.FailureDiagnostic) *api.FailureDiagnostic {
 	if d.Code == "" {
 		return nil
 	}
-	out := &api.FailureDiagnostic{Code: d.Code, Message: d.Message}
+	out := &api.FailureDiagnostic{Code: d.Code, Message: d.Message, Phase: d.Phase, TaxonomyVersion: d.TaxonomyVersion}
 	if d.HTTPStatus != 0 {
 		out.HTTPStatus = &d.HTTPStatus
 	}

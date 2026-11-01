@@ -168,7 +168,7 @@ func TestProjectionReportsConsecutivePulseFailures(t *testing.T) {
 	}
 }
 
-func TestExpiredInterventionNeverInvokesProvider(t *testing.T) {
+func TestQueuedInterventionBudgetStartsAfterCapacityWait(t *testing.T) {
 	var calls atomic.Int32
 	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { calls.Add(1); w.WriteHeader(200) }))
 	defer receiver.Close()
@@ -180,7 +180,10 @@ func TestExpiredInterventionNeverInvokesProvider(t *testing.T) {
 		monitor := applyIncidentPulse(t, system, ent, jobs.Result{Err: errors.New("down")})
 		original := incidentActions(monitor, "intervention", "")[0]
 		system.dispatchActions(time.Now())
-		time.Sleep(time.Until(original.Deadline) + time.Second)
+		if !original.Deadline.IsZero() || original.ExecutionBudget <= 0 {
+			t.Fatal("new action started its budget while queued")
+		}
+		time.Sleep(2*original.ExecutionBudget + time.Second)
 		queue.rejected = false
 		system.dispatchActions(time.Now())
 		for _, job := range queue.admitted {
@@ -190,8 +193,9 @@ func TestExpiredInterventionNeverInvokesProvider(t *testing.T) {
 			}
 		}
 		current, _ := monitorWithActionHistory(t, system.store, monitor.ID)
-		if calls.Load() != 0 || current.Actions[original.ID].State != persistence.Cancelled {
-			t.Fatal("expired queue did not cancel without a provider invocation")
+		finished := current.Actions[original.ID]
+		if calls.Load() != 1 || finished.State != persistence.Succeeded || !finished.Deadline.Equal(finished.StartedAt.Add(original.ExecutionBudget)) {
+			t.Fatal("capacity wait consumed the execution budget or repeated an action")
 		}
 	})
 }

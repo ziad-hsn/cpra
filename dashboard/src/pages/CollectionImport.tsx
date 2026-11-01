@@ -309,7 +309,7 @@ export default function CollectionImport() {
   const canWait = !!operation && (validationWait ? allowed.has('GetOperationValidation') : allowed.has('GetOperation')) &&
     collectionProgressPending(operation);
   const pendingDraft = !!summary && !collectionTerminal(operation);
-  return <main className="page">
+  return <section className="page">
     <DirtyDraftGuard dirty={pendingDraft || !!busy || notificationDraft} />
     <h1>Apply configuration</h1>
     <p>Choose YAML or JSON files for monitors, recipients, notification endpoints, groups and secrets. Files are parsed in a private worker; the preview shows identities and outcomes, never secret values.</p>
@@ -389,5 +389,5 @@ export default function CollectionImport() {
       {confirm === 'activate' && <p>Apply the {summary?.itemCount} resources reviewed for operation <span className="mono">{operation?.id}</span>, using saved validation result <span className="mono">{validation?.summary.resultID}</span>.</p>}
       <p>{confirm === 'activate' ? 'This changes active configuration and can affect monitoring, recovery and notification delivery. Each resource is conditional; conflicts or dependency failures can produce partial results.' : 'Cancellation is a separate server request. It does not roll back changes already committed or reverse external actions.'}</p>
     </ConfirmDialog>}
-  </main>;
+  </section>;
 }

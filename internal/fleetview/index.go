@@ -261,6 +261,26 @@ func (i *Index) Page(offset, limit int, match func(MonitorSummary) bool) ([]Moni
 
 // Each response owns its bounded slices; callers never mutate published rows.
 func cloneSummary(m MonitorSummary) MonitorSummary {
+	if m.RecoveryDecision != nil {
+		d := *m.RecoveryDecision
+		if d.Selected != nil {
+			selected := *d.Selected
+			d.Selected = &selected
+		}
+		m.RecoveryDecision = &d
+	}
+	if m.RecoveryAdmission != nil {
+		a := *m.RecoveryAdmission
+		if a.Deadline != nil {
+			value := *a.Deadline
+			a.Deadline = &value
+		}
+		if a.NotBefore != nil {
+			value := *a.NotBefore
+			a.NotBefore = &value
+		}
+		m.RecoveryAdmission = &a
+	}
 	m.ActiveCodes = slices.Clone(m.ActiveCodes)
 	m.ConfigurationWarnings = slices.Clone(m.ConfigurationWarnings)
 	m.NotificationConditions = slices.Clone(m.NotificationConditions)

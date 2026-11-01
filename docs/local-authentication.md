@@ -178,7 +178,7 @@ token sources cannot restore access automatically.
 
 ```bash
 cpractl local auth list --data-dir /absolute/restored-state
-cpractl local auth reprovision restored-oncall --role operator \
+cpractl local auth reprovision restored-oncall --mode management --role operator \
   --data-dir /absolute/restored-state \
   --token-output /home/you/.config/cpra-access/restored-oncall.token
 ```
@@ -186,6 +186,22 @@ cpractl local auth reprovision restored-oncall --role operator \
 `reprovision` applies only to a store marked as awaiting restored authentication.
 It binds the current reset epoch and revision and installs only the explicitly
 selected new principal; issue the remaining named principals with fresh tokens.
+For an authenticated file-configured installation, explicitly preserve its
+read-only access mode instead:
+
+```bash
+cpractl local auth reprovision --mode observation \
+  --data-dir /absolute/restored-state \
+  --token-output /home/you/.config/cpra-access/restored-reader.token
+```
+
+Observation provisioning accepts no principal, role or expiry. It replaces
+restored grants with a fresh shared read token in the new epoch; it does not
+enable management or resurrect previous tokens. Keep `management.enabled`
+unchanged in the runtime configuration and use the matching mode. Restart with
+the protected new token file, then verify authenticated reads and readiness.
+Management provisioning uses the explicitly named principal and its role.
+
 Ordinary `bootstrap`, `issue`, `rotate` and `revoke` cannot bypass that reset.
 Reopening an ordinary stopped store for access administration does not recover
 incidents, mark executors finished or dispatch work. Completing a previously

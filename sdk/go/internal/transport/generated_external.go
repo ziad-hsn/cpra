@@ -173,10 +173,14 @@ type GetHistoryParams struct {
 
 // ListIncidentsParams defines parameters for ListIncidents.
 type ListIncidentsParams struct {
-	Cursor    *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
-	Selector  *string `form:"selector,omitempty" json:"selector,omitempty"`
-	MonitorID *string `form:"monitorID,omitempty" json:"monitorID,omitempty"`
+	Cursor       *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit        *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Selector     *string `form:"selector,omitempty" json:"selector,omitempty"`
+	MonitorID    *string `form:"monitorID,omitempty" json:"monitorID,omitempty"`
+	State        *string `form:"state,omitempty" json:"state,omitempty"`
+	Acknowledged *bool   `form:"acknowledged,omitempty" json:"acknowledged,omitempty"`
+	Dismissed    *bool   `form:"dismissed,omitempty" json:"dismissed,omitempty"`
+	Order        *string `form:"order,omitempty" json:"order,omitempty"`
 }
 
 // AcknowledgeIncidentParams defines parameters for AcknowledgeIncident.
@@ -742,7 +746,7 @@ type ClientInterface interface {
 
 	// WorkerHeartbeatWithBody WorkerHeartbeat
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -751,7 +755,7 @@ type ClientInterface interface {
 
 	// WorkerHeartbeat WorkerHeartbeat
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -760,7 +764,7 @@ type ClientInterface interface {
 
 	// WorkerLateEvidenceWithBody WorkerLateEvidence
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -769,7 +773,7 @@ type ClientInterface interface {
 
 	// WorkerLateEvidence WorkerLateEvidence
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -778,7 +782,7 @@ type ClientInterface interface {
 
 	// WorkerPollWithBody WorkerPoll
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -787,7 +791,7 @@ type ClientInterface interface {
 
 	// WorkerPoll WorkerPoll
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -796,7 +800,7 @@ type ClientInterface interface {
 
 	// WorkerResultWithBody WorkerResult
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -805,7 +809,7 @@ type ClientInterface interface {
 
 	// WorkerResult WorkerResult
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -814,7 +818,7 @@ type ClientInterface interface {
 
 	// WorkerStartWithBody WorkerStart
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -823,7 +827,7 @@ type ClientInterface interface {
 
 	// WorkerStart WorkerStart
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -841,6 +845,8 @@ type ClientInterface interface {
 	GetHistory(ctx context.Context, params *GetHistoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListIncidents ListIncidents
+	//
+	// Frozen latest episode per monitor. Filters and ordering are bound to the cursor. Triage orders open, pending, closed; undismissed before dismissed; unacknowledged before acknowledged; oldest first-failure timestamp, then ID. Sparse filters can return empty pages with an advancing cursor. Earlier episodes remain in history.
 	//
 	// Corresponds with GET /api/v2/incidents (the `ListIncidents` operationId).
 	ListIncidents(ctx context.Context, params *ListIncidentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1760,7 +1766,7 @@ func (c *Client) ListWorkers(ctx context.Context, params *ListWorkersParams, req
 
 // WorkerHeartbeatWithBody WorkerHeartbeat
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1779,7 +1785,7 @@ func (c *Client) WorkerHeartbeatWithBody(ctx context.Context, contentType string
 
 // WorkerHeartbeat WorkerHeartbeat
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1798,7 +1804,7 @@ func (c *Client) WorkerHeartbeat(ctx context.Context, body WorkerHeartbeatJSONRe
 
 // WorkerLateEvidenceWithBody WorkerLateEvidence
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1817,7 +1823,7 @@ func (c *Client) WorkerLateEvidenceWithBody(ctx context.Context, contentType str
 
 // WorkerLateEvidence WorkerLateEvidence
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1836,7 +1842,7 @@ func (c *Client) WorkerLateEvidence(ctx context.Context, body WorkerLateEvidence
 
 // WorkerPollWithBody WorkerPoll
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1855,7 +1861,7 @@ func (c *Client) WorkerPollWithBody(ctx context.Context, contentType string, bod
 
 // WorkerPoll WorkerPoll
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1874,7 +1880,7 @@ func (c *Client) WorkerPoll(ctx context.Context, body WorkerPollJSONRequestBody,
 
 // WorkerResultWithBody WorkerResult
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1893,7 +1899,7 @@ func (c *Client) WorkerResultWithBody(ctx context.Context, contentType string, b
 
 // WorkerResult WorkerResult
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1912,7 +1918,7 @@ func (c *Client) WorkerResult(ctx context.Context, body WorkerResultJSONRequestB
 
 // WorkerStartWithBody WorkerStart
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1931,7 +1937,7 @@ func (c *Client) WorkerStartWithBody(ctx context.Context, contentType string, bo
 
 // WorkerStart WorkerStart
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1979,6 +1985,8 @@ func (c *Client) GetHistory(ctx context.Context, params *GetHistoryParams, reqEd
 }
 
 // ListIncidents ListIncidents
+//
+// Frozen latest episode per monitor. Filters and ordering are bound to the cursor. Triage orders open, pending, closed; undismissed before dismissed; unacknowledged before acknowledged; oldest first-failure timestamp, then ID. Sparse filters can return empty pages with an advancing cursor. Earlier episodes remain in history.
 //
 // Corresponds with GET /api/v2/incidents (the `ListIncidents` operationId).
 func (c *Client) ListIncidents(ctx context.Context, params *ListIncidentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -4613,6 +4621,54 @@ func NewListIncidentsRequest(server string, params *ListIncidentsParams) (*http.
 		if params.MonitorID != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "monitorID", *params.MonitorID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.State != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Acknowledged != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "acknowledged", *params.Acknowledged, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Dismissed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "dismissed", *params.Dismissed, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Order != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "order", *params.Order, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -8312,7 +8368,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerHeartbeatWithBodyWithResponse WorkerHeartbeat
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8321,7 +8377,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerHeartbeatWithResponse WorkerHeartbeat
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8330,7 +8386,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerLateEvidenceWithBodyWithResponse WorkerLateEvidence
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8339,7 +8395,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerLateEvidenceWithResponse WorkerLateEvidence
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8348,7 +8404,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerPollWithBodyWithResponse WorkerPoll
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8357,7 +8413,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerPollWithResponse WorkerPoll
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8366,7 +8422,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerResultWithBodyWithResponse WorkerResult
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8375,7 +8431,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerResultWithResponse WorkerResult
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8384,7 +8440,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerStartWithBodyWithResponse WorkerStart
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8393,7 +8449,7 @@ type ClientWithResponsesInterface interface {
 
 	// WorkerStartWithResponse WorkerStart
 	//
-	// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+	// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -8415,6 +8471,8 @@ type ClientWithResponsesInterface interface {
 	GetHistoryWithResponse(ctx context.Context, params *GetHistoryParams, reqEditors ...RequestEditorFn) (*GetHistoryResponse, error)
 
 	// ListIncidentsWithResponse ListIncidents
+	//
+	// Frozen latest episode per monitor. Filters and ordering are bound to the cursor. Triage orders open, pending, closed; undismissed before dismissed; unacknowledged before acknowledged; oldest first-failure timestamp, then ID. Sparse filters can return empty pages with an advancing cursor. Earlier episodes remain in history.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -13529,7 +13587,7 @@ func (c *ClientWithResponses) ListWorkersWithResponse(ctx context.Context, param
 
 // WorkerHeartbeatWithBodyWithResponse WorkerHeartbeat
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13544,7 +13602,7 @@ func (c *ClientWithResponses) WorkerHeartbeatWithBodyWithResponse(ctx context.Co
 
 // WorkerHeartbeatWithResponse WorkerHeartbeat
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13559,7 +13617,7 @@ func (c *ClientWithResponses) WorkerHeartbeatWithResponse(ctx context.Context, b
 
 // WorkerLateEvidenceWithBodyWithResponse WorkerLateEvidence
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13574,7 +13632,7 @@ func (c *ClientWithResponses) WorkerLateEvidenceWithBodyWithResponse(ctx context
 
 // WorkerLateEvidenceWithResponse WorkerLateEvidence
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13589,7 +13647,7 @@ func (c *ClientWithResponses) WorkerLateEvidenceWithResponse(ctx context.Context
 
 // WorkerPollWithBodyWithResponse WorkerPoll
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13604,7 +13662,7 @@ func (c *ClientWithResponses) WorkerPollWithBodyWithResponse(ctx context.Context
 
 // WorkerPollWithResponse WorkerPoll
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13619,7 +13677,7 @@ func (c *ClientWithResponses) WorkerPollWithResponse(ctx context.Context, body W
 
 // WorkerResultWithBodyWithResponse WorkerResult
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13634,7 +13692,7 @@ func (c *ClientWithResponses) WorkerResultWithBodyWithResponse(ctx context.Conte
 
 // WorkerResultWithResponse WorkerResult
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13649,7 +13707,7 @@ func (c *ClientWithResponses) WorkerResultWithResponse(ctx context.Context, body
 
 // WorkerStartWithBodyWithResponse WorkerStart
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13664,7 +13722,7 @@ func (c *ClientWithResponses) WorkerStartWithBodyWithResponse(ctx context.Contex
 
 // WorkerStartWithResponse WorkerStart
 //
-// Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
+// Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13704,6 +13762,8 @@ func (c *ClientWithResponses) GetHistoryWithResponse(ctx context.Context, params
 }
 
 // ListIncidentsWithResponse ListIncidents
+//
+// Frozen latest episode per monitor. Filters and ordering are bound to the cursor. Triage orders open, pending, closed; undismissed before dismissed; unacknowledged before acknowledged; oldest first-failure timestamp, then ID. Sparse filters can return empty pages with an advancing cursor. Earlier episodes remain in history.
 //
 // Returns a wrapper object for the known response body format(s).
 //

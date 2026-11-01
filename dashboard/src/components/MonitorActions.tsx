@@ -75,6 +75,7 @@ export function MonitorActions({ monitorID }: { monitorID: string }) {
     {page.data && <>
       {page.data.items.length === 0 ? <p>No retained actions for this monitor.</p> : <ul className="stack-12">{page.data.items.map(action => <li key={action.id} style={{ overflowWrap: 'anywhere' }}>
         <strong>{action.kind === 'intervention' ? 'Recovery' : action.kind === 'code' ? 'Notification' : action.kind || 'Action'}</strong> · <span className="mono">{action.id}</span>
+        {action.recoverySelection && <p>Selected rule: {action.recoverySelection.ruleID} · {action.recoverySelection.driver} · Observation {action.recoverySelection.observationID} · Configuration {action.recoverySelection.configurationRevision}. The first committed start binds this selection for the incident.</p>}
         <p>{['queued', 'started', 'cancelled'].includes(action.state) && !action.outcome ? 'Execution state' : 'Provider outcome'}: {(action.outcome || action.state).replaceAll('_', ' ')}. {action.held === true ? 'Held for investigation.' : action.held === false ? 'No investigation hold.' : 'Hold status unavailable.'}</p>
         {action.terminationReason && <p>Stopped: {terminationLabel(action.terminationReason)}. This does not authorize another attempt.</p>}
         {action.color && (Object.prototype.hasOwnProperty.call(CODE_LABELS, action.color) ? <CodeBadge code={action.color as CpraCode} /> : <span>Notification: {action.color}</span>)}

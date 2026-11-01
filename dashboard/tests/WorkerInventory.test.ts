@@ -12,6 +12,18 @@ const raw = (id: string, length = 0) => encode(JSON.stringify({ apiVersion: 'cpr
 afterEach(() => vi.restoreAllMocks());
 
 describe('private worker inventory', () => {
+  it('retains the exact bounded overlap warning count and strips arbitrary values', async () => {
+    const inventory = await WorkerCollectionInventory.create(1);
+    try {
+      await inventory.addSource(encode('source'));
+      const warnings = Array.from({ length: 31 }, (_, i) => ({ field: `spec.recovery.rules[${i + 1}]`, reason: 'partialOverlap', message: 'PRIVATE_VALUE' }));
+      warnings.push({ field: 'spec.notifications.red.trigger', reason: 'recoveryOnlyCoverage', message: 'PRIVATE_VALUE' }, { field: 'spec.notifications.blue', reason: 'unknownRecoveryDestination', message: 'PRIVATE_VALUE' });
+      inventory.addItem(raw('overlap'), 'Credential/overlap', 1, 1, undefined, warnings);
+      expect((await inventory.finish()).warningCount).toBe(33);
+      expect(inventory.page(0)[0].warnings).toHaveLength(33);
+      expect(JSON.stringify(inventory.page(0))).not.toContain('PRIVATE_VALUE');
+    } finally { inventory.close(); }
+  });
   it('keeps bounded coordinates local without changing operation commitments', async () => {
     vi.spyOn(crypto, 'getRandomValues').mockImplementation(array => { new Uint8Array(array!.buffer, array!.byteOffset, array!.byteLength).set(fromHex(vectors.KeyHex)); return array; });
     const inventory = await WorkerCollectionInventory.create(vectors.Sources.length);
@@ -112,7 +124,7 @@ describe('private worker inventory', () => {
     try {
       await inventory.addSource(encode('source'));
       const known = { field: 'spec.notifications.blue', reason: 'unknownRecoveryDestination' };
-      for (const warnings of [{ secret: 'PRIVATE_ADVISORY' }, [{ ...known, field: 'PRIVATE_ADVISORY' }], [{ ...known, reason: 'PRIVATE_ADVISORY' }], Array(9).fill(known)]) {
+      for (const warnings of [{ secret: 'PRIVATE_ADVISORY' }, [{ ...known, field: 'PRIVATE_ADVISORY' }], [{ ...known, reason: 'PRIVATE_ADVISORY' }], Array(34).fill(known)]) {
         expect(() => inventory.addItem(raw('one'), 'Credential/one', 1, 1, undefined, warnings)).toThrow('Invalid collection input');
       }
       expect(inventory.itemCount).toBe(0);

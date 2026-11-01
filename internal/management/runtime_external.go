@@ -179,7 +179,13 @@ func externalRuntimeBindings(ctx context.Context, resource api.Resource, record 
 			return nil, err
 		}
 		if spec.Recovery != nil {
-			if err := bind("recovery", "recovery", spec.Recovery.Driver); err != nil {
+			if err := api.VisitRecoveryDrivers(spec.Recovery, func(path string, driver *api.DriverConfig) error {
+				slot := "recovery"
+				if path != "driver" {
+					slot += "." + path
+				}
+				return bind(slot, "recovery", *driver)
+			}); err != nil {
 				return nil, err
 			}
 		}
@@ -216,4 +222,32 @@ func externalRuntimeBindings(ctx context.Context, resource api.Resource, record 
 		return nil, err
 	}
 	return out, nil
+}
+
+func (p *RuntimePreparation) prepareRuleContracts(ctx context.Context, c *Catalog) error {
+	if len(p.Monitor.Intervention.Rules) == 0 {
+		return nil
+	}
+	if marker, ok := p.Monitor.Pulse.Config.(*manifest.ExternalPulseConfig); ok {
+		ref := marker.Key.JobType
+		selected, exists, err := c.store.LookupJobTypeVersion(ctx, ref.JobTypeID, ref.Version)
+		if err != nil {
+			return err
+		}
+		if !exists || selected.Version.Record.UID != ref.JobTypeUID || selected.Version.Record.Revision != ref.Revision || selected.Version.ProtocolVersion != "2" {
+			return ErrValidation
+		}
+		contract := selected.Version.FailureContract()
+		marker.FailureContract = &contract
+	}
+	for _, rule := range p.Monitor.Intervention.Rules {
+		if marker, ok := rule.Target.(*manifest.ExternalInterventionConfig); ok {
+			budget, err := c.interventionBudget(ctx, marker)
+			if err != nil {
+				return err
+			}
+			marker.Budget = budget
+		}
+	}
+	return nil
 }

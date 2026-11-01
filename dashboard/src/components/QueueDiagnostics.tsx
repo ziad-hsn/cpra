@@ -32,6 +32,7 @@ export function QueueDiagnostics({ name, queue: q }: { name: string; queue: Queu
     <StatRow label="Observed average wait" value={q.dequeued > 0 ? duration(q.avg_queue_time) : 'Unavailable (no dequeued samples)'} />
     <StatRow label="Observed maximum wait" value={q.dequeued > 0 ? duration(q.max_queue_time) : 'Unavailable (no dequeued samples)'} />
     <StatRow label="Oldest queued work" value={oldestPending(q)} />
+    <StatRow label="Completed, awaiting reconciliation" value={number(q.awaiting_reconciliation)} />
     <StatRow label="Arrival variability (CV)" value={(q.arrival_samples ?? 0) >= 2 && valid(q.arrival_cv) ? q.arrival_cv.toFixed(3) : 'Unavailable'} />
     <StatRow label="Variability samples" value={number(q.arrival_samples)} /><StatRow label="Rate sample window" value={q.sample_window > 0 ? duration(q.sample_window) : 'Unavailable'} />
     {q.drivers?.map(driver => <section key={driver.driver} aria-label={`${driver.driver} scheduling`}>
@@ -39,11 +40,14 @@ export function QueueDiagnostics({ name, queue: q }: { name: string; queue: Queu
       <StatRow label="Pending / in flight" value={`${number(driver.pending)} / ${number(driver.active)}`} />
       <StatRow label="Requested / supplied reservation" value={`${number(driver.requested_capacity)} / ${number(driver.reserved_capacity)}`} />
       <StatRow label="Concurrency allowance" value={number(driver.concurrency_limit)} />
+      <StatRow label="Worker headroom before admission constraints" value={number(driver.worker_headroom)} />
+      <StatRow label="Per-destination ceiling" value={driver.destination_concurrency === undefined ? 'Not reported or not applicable' : number(driver.destination_concurrency)} />
+      <StatRow label="Admissions deferred by pacing since startup" value={number(driver.rate_deferred_total)} />
       <StatRow label="Oldest pending / active" value={`${driver.pending ? duration(driver.oldest_pending_age) : 'None'} / ${driver.active ? duration(driver.oldest_active_age) : 'None'}`} />
       <StatRow label="Rejected / timed out" value={`${number(driver.rejections)} / ${number(driver.timeouts)}`} />
       <StatRow label="Scheduling condition" value={driver.condition.replaceAll('_', ' ')} />
     </section>)}
-    <p className="muted">Saturation is the current depth divided by capacity. Observed waits describe dequeued work, not the age of work still waiting. Oldest queued work measures an admitted copy still waiting for dequeue; work already removed for execution is excluded. Depth and age are separate observations during concurrent activity.</p>
+    <p className="muted">Saturation is current depth divided by capacity. Observed waits describe dequeued work. Oldest queued work excludes work already removed for execution. Worker headroom is an upper bound before destination ordering, pacing and durable admission; it is not a count of notifications that can start now. Deferred admissions are counted once per queued copy, not on each dispatcher poll. Depth and age are separate observations during concurrent activity.</p>
   </section>;
 }
 

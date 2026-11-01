@@ -23,6 +23,11 @@ Write the operator reason into the named UTF-8 file, or use `--reason-file -` to
 read stdin. Audit text is not accepted inline in command arguments. A reason is
 required and retained in history; keep credentials out of it.
 
+For a monitor using [intervention rules](intervention-rules.md), also supply
+`--rule-id`, `--decision-revision` and `--configuration-revision` from its current
+recovery decision. The rule must currently qualify; naming a rule cannot bypass
+its conditions. The original control revision and reason remain required.
+
 The server checks the installed target and credentials, unhealthy observation,
 enabled/snooze/maintenance state, configured recovery, attempt budget, cooldown,
 verification, existing interventions and operator rate policy. A request cannot

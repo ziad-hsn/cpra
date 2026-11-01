@@ -40,6 +40,9 @@ type ControlResult struct {
 // PrepareControl validates an operator request without changing durable state.
 // The authenticated actor is supplied separately at the commit boundary.
 func (c *Catalog) PrepareControl(ctx context.Context, action, id string, req api.ControlRequest) (*PreparedControl, error) {
+	if req.RuleID != "" || req.DecisionRevision != "" || req.ConfigurationRevision != "" {
+		return nil, persistence.ErrControlInvalid
+	}
 	if ctx == nil {
 		return nil, ErrValidation
 	}

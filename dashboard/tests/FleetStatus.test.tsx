@@ -23,6 +23,16 @@ afterEach(() => {
  data.overview = {generated: new Date().toISOString(), total: 1, disabled: 0, by_status: {degraded: 1}, by_pulse_type: {tls: 1}, by_code: {yellow: 1}, up_percent: 0, index_capped: false};
 });
 
+it('shows simultaneous critical incidents, unavailable checks and suppression',()=>{
+ data.overview={...data.overview,total:10,by_status:{incident:2},unsuppressed_unhealthy:2,unavailable:3,suppressed_unhealthy:1};
+ render(<MemoryRouter><Topbar /></MemoryRouter>);
+ const status=screen.getByRole('status',{name:'Global fleet status'});
+ expect(status).toHaveTextContent('2 monitors critical');
+ expect(status).toHaveTextContent('3 monitors unavailable');
+ expect(status).toHaveTextContent('1 unhealthy monitor — notifications suppressed');
+ expect(status).not.toHaveTextContent('All systems operational');
+});
+
 it('labels cached healthy observations unavailable while offline', () => {
  data.overview = {...data.overview, total: 1, disabled: 0, by_status: {up: 1}};
  render(<MemoryRouter><Topbar /></MemoryRouter>);

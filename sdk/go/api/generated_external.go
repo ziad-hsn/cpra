@@ -176,19 +176,40 @@ func (e CollectionStorageAccountingUsageCoverage) Valid() bool {
 
 // Defines values for FailureDiagnosticGrpcStatus.
 const (
-	NOTSERVING     FailureDiagnosticGrpcStatus = "NOT_SERVING"
-	SERVICEUNKNOWN FailureDiagnosticGrpcStatus = "SERVICE_UNKNOWN"
-	UNKNOWN        FailureDiagnosticGrpcStatus = "UNKNOWN"
+	FailureDiagnosticGrpcStatusNOTSERVING     FailureDiagnosticGrpcStatus = "NOT_SERVING"
+	FailureDiagnosticGrpcStatusSERVICEUNKNOWN FailureDiagnosticGrpcStatus = "SERVICE_UNKNOWN"
+	FailureDiagnosticGrpcStatusUNKNOWN        FailureDiagnosticGrpcStatus = "UNKNOWN"
 )
 
 // Valid indicates whether the value is a known member of the FailureDiagnosticGrpcStatus enum.
 func (e FailureDiagnosticGrpcStatus) Valid() bool {
 	switch e {
-	case NOTSERVING:
+	case FailureDiagnosticGrpcStatusNOTSERVING:
 		return true
-	case SERVICEUNKNOWN:
+	case FailureDiagnosticGrpcStatusSERVICEUNKNOWN:
 		return true
-	case UNKNOWN:
+	case FailureDiagnosticGrpcStatusUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FailureMatchGrpcStatuses.
+const (
+	FailureMatchGrpcStatusesNOTSERVING     FailureMatchGrpcStatuses = "NOT_SERVING"
+	FailureMatchGrpcStatusesSERVICEUNKNOWN FailureMatchGrpcStatuses = "SERVICE_UNKNOWN"
+	FailureMatchGrpcStatusesUNKNOWN        FailureMatchGrpcStatuses = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the FailureMatchGrpcStatuses enum.
+func (e FailureMatchGrpcStatuses) Valid() bool {
+	switch e {
+	case FailureMatchGrpcStatusesNOTSERVING:
+		return true
+	case FailureMatchGrpcStatusesSERVICEUNKNOWN:
+		return true
+	case FailureMatchGrpcStatusesUNKNOWN:
 		return true
 	default:
 		return false
@@ -558,7 +579,8 @@ type Action struct {
 	ReceiptID string     `json:"receiptID,omitempty"`
 
 	// RecoveryFailure Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.
-	RecoveryFailure *RecoveryFailure `json:"recoveryFailure,omitempty"`
+	RecoveryFailure   *RecoveryFailure   `json:"recoveryFailure,omitempty"`
+	RecoverySelection *RecoverySelection `json:"recoverySelection,omitempty"`
 
 	// Resolution Resolution of an earlier exposed episode. RecoveredAt belongs to that episode; health describes the latest committed observation at start eligibility.
 	Resolution *ResolutionNotice `json:"resolution,omitempty"`
@@ -774,6 +796,7 @@ type Assignment struct {
 	Deadline          time.Time `json:"deadline"`
 	ExecutionID       string    `json:"executionID"`
 	ExecutionRevision string    `json:"executionRevision"`
+	FailureCodes      []string  `json:"failureCodes,omitempty"`
 	IncarnationUID    string    `json:"incarnationUID"`
 	JobTypeID         string    `json:"jobTypeID"`
 	JobTypeUID        string    `json:"jobTypeUID"`
@@ -785,9 +808,12 @@ type Assignment struct {
 	// Notification Committed notification context, separate from operator parameters. No provider credential is supplied. Format 2 adds an earlier-episode resolution with its recovery timestamp and current observed health.
 	Notification *WorkerNotification `json:"notification,omitempty"`
 	Parameters   json.RawMessage     `json:"parameters"`
-	ServerID     string              `json:"serverID"`
-	SessionID    string              `json:"sessionID"`
-	WorkerUID    string              `json:"workerUID"`
+
+	// ProtocolVersion Omitted means protocol 1. Protocol 2 explicitly supports structured check failures.
+	ProtocolVersion string `json:"protocolVersion,omitempty"`
+	ServerID        string `json:"serverID"`
+	SessionID       string `json:"sessionID"`
+	WorkerUID       string `json:"workerUID"`
 }
 
 // Assignments defines model for Assignments.
@@ -813,6 +839,7 @@ type AutoIgnore struct {
 type Capabilities struct {
 	APIVersions        []string            `json:"apiVersions"`
 	Drivers            map[string][]string `json:"drivers"`
+	FailureTaxonomies  []FailureTaxonomy   `json:"failureTaxonomies,omitempty"`
 	NotificationColors []string            `json:"notificationColors,omitempty"`
 	PatchTypes         []string            `json:"patchTypes"`
 
@@ -1072,6 +1099,12 @@ type CollectionStorageAccountingUsageCoverage string
 
 // ControlRequest defines model for ControlRequest.
 type ControlRequest struct {
+	// ConfigurationRevision Guarded rule recovery precondition; required together for rule-based recovery. Not valid on other controls.
+	ConfigurationRevision string `json:"configurationRevision,omitempty"`
+
+	// DecisionRevision Guarded rule recovery precondition; required together for rule-based recovery. Not valid on other controls.
+	DecisionRevision string `json:"decisionRevision,omitempty"`
+
 	// Duration Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.
 	Duration     Duration `json:"duration,omitempty"`
 	EvidenceRefs []string `json:"evidenceRefs,omitempty"`
@@ -1080,6 +1113,9 @@ type ControlRequest struct {
 	Reason       string   `json:"reason,omitempty"`
 	Resolution   string   `json:"resolution,omitempty"`
 	Revision     string   `json:"revision"`
+
+	// RuleID Guarded rule recovery precondition; required together for rule-based recovery. Not valid on other controls.
+	RuleID string `json:"ruleID,omitempty"`
 }
 
 // Credential defines model for Credential.
@@ -1120,12 +1156,18 @@ type DriverQueue struct {
 	ConcurrencyLimit int64 `json:"concurrencyLimit"`
 
 	// Condition Current scheduling constraint; not a health or SLA claim.
-	Condition       string      `json:"condition"`
-	Driver          string      `json:"driver"`
-	OldestActiveMS  Measurement `json:"oldestActiveMs,omitempty"`
-	OldestPendingMS Measurement `json:"oldestPendingMs,omitempty"`
-	Pending         int64       `json:"pending"`
-	Rejections      int64       `json:"rejections"`
+	Condition string `json:"condition"`
+
+	// DestinationConcurrency Configured per-destination ceiling. Absent for check queues. Pacing and global allocation can impose smaller limits.
+	DestinationConcurrency *int64      `json:"destinationConcurrency,omitempty"`
+	Driver                 string      `json:"driver"`
+	OldestActiveMS         Measurement `json:"oldestActiveMs,omitempty"`
+	OldestPendingMS        Measurement `json:"oldestPendingMs,omitempty"`
+	Pending                int64       `json:"pending"`
+
+	// RateDeferredTotal Process-lifetime count of queued admissions observed waiting for pacing, counted once per admitted copy. Not current blocked depth.
+	RateDeferredTotal *int64 `json:"rateDeferredTotal,omitempty"`
+	Rejections        int64  `json:"rejections"`
 
 	// RequestedCapacity Configured timeout occupancy reservation including 15 percent headroom.
 	RequestedCapacity int64 `json:"requestedCapacity"`
@@ -1136,6 +1178,9 @@ type DriverQueue struct {
 	// ReservedCapacity Reservation granted within current pool capacity; may be below requested capacity.
 	ReservedCapacity int64 `json:"reservedCapacity"`
 	Timeouts         int64 `json:"timeouts"`
+
+	// WorkerHeadroom Driver concurrency allowance minus active work, before destination, sequence, pacing and durable admission restrictions. Not a count of executable notifications.
+	WorkerHeadroom *int64 `json:"workerHeadroom,omitempty"`
 }
 
 // Duration Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.
@@ -1356,6 +1401,17 @@ type ExternalConfig struct {
 	Version           string          `json:"version"`
 }
 
+// FailureCodeInfo defines model for FailureCodeInfo.
+type FailureCodeInfo struct {
+	Available bool     `json:"available"`
+	Code      string   `json:"code"`
+	Details   []string `json:"details"`
+	Drivers   []string `json:"drivers"`
+	Eligible  bool     `json:"eligible"`
+	Message   string   `json:"message"`
+	Phases    []string `json:"phases"`
+}
+
 // FailureDiagnostic Bounded safe failure explanation. No provider response body, address, path or credential is included.
 type FailureDiagnostic struct {
 	CertificateDaysRemaining *int                         `json:"certificateDaysRemaining,omitempty"`
@@ -1365,10 +1421,31 @@ type FailureDiagnostic struct {
 	GRPCStatus               *FailureDiagnosticGrpcStatus `json:"grpcStatus,omitempty"`
 	HTTPStatus               *int                         `json:"httpStatus,omitempty"`
 	Message                  string                       `json:"message"`
+	Phase                    string                       `json:"phase,omitempty"`
+	TaxonomyVersion          string                       `json:"taxonomyVersion,omitempty"`
 }
 
 // FailureDiagnosticGrpcStatus defines model for FailureDiagnostic.GrpcStatus.
 type FailureDiagnosticGrpcStatus string
+
+// FailureMatch defines model for FailureMatch.
+type FailureMatch struct {
+	// Codes Exact registered codes or terminal dot prefixes, such as tls.cert.*.
+	Codes        []string                   `json:"codes"`
+	GRPCCodes    []string                   `json:"grpcCodes,omitzero"`
+	GRPCStatuses []FailureMatchGrpcStatuses `json:"grpcStatuses,omitzero"`
+	HTTPStatuses []int                      `json:"httpStatuses,omitzero"`
+	Phases       []string                   `json:"phases,omitzero"`
+}
+
+// FailureMatchGrpcStatuses defines model for FailureMatch.GrpcStatuses.
+type FailureMatchGrpcStatuses string
+
+// FailureTaxonomy defines model for FailureTaxonomy.
+type FailureTaxonomy struct {
+	Codes   []FailureCodeInfo `json:"codes"`
+	Version string            `json:"version"`
+}
 
 // FieldError defines model for FieldError.
 type FieldError struct {
@@ -1539,6 +1616,7 @@ type JobTypeList struct {
 
 // JobTypeSpec defines model for JobTypeSpec.
 type JobTypeSpec struct {
+	FailureCodes    []string        `json:"failureCodes,omitempty"`
 	Handler         string          `json:"handler"`
 	Kind            string          `json:"kind"`
 	ParameterSchema json.RawMessage `json:"parameterSchema"`
@@ -1643,6 +1721,9 @@ type MonitorObservation struct {
 	// Availability Owner-published check availability. observedAt is the controller assessment time, never a substitute for a completed check timestamp. Pending means no real check result; paused means disabled or committed snooze; unavailable means local preparation or controller projection is unavailable.
 	Availability MonitorAvailability `json:"availability,omitempty"`
 
+	// CancelledNotifications Retained cancelled notification attempts. Cancellation is not provider acceptance or delivery.
+	CancelledNotifications *int64 `json:"cancelledNotifications,omitempty"`
+
 	// CertificateVerificationDisabled Explicit per-monitor TLS certificate verification bypass. Does not affect API authentication or recovery verification.
 	CertificateVerificationDisabled bool   `json:"certificateVerificationDisabled"`
 	CheckAdmission                  string `json:"checkAdmission,omitempty"`
@@ -1716,6 +1797,10 @@ type MonitorObservation struct {
 	PendingNotifications    int64                   `json:"pendingNotifications"`
 	Phase                   MonitorObservationPhase `json:"phase"`
 	QueueRejections         int64                   `json:"queueRejections"`
+
+	// RecoveryAdmission Read-only policy assessment at observedAt. It grants no execution permission; writes and starts recheck authority, revisions, cooldowns and fences. Capacity and storage availability are reported separately.
+	RecoveryAdmission *RecoveryAdmission `json:"recoveryAdmission,omitempty"`
+	RecoveryDecision  *RecoveryDecision  `json:"recoveryDecision,omitempty"`
 
 	// SnoozedUntil Absent when unavailable.
 	SnoozedUntil *time.Time               `json:"snoozedUntil,omitempty"`
@@ -1816,10 +1901,14 @@ type MonitorStatus struct {
 	NotificationConditionsTruncated bool `json:"notificationConditionsTruncated,omitempty"`
 
 	// NotificationsSuppressed Ordinary notification suppression captured by the owner. Gray control notices retain their documented exception. Absent when a matching projection is unavailable.
-	NotificationsSuppressed *bool     `json:"notificationsSuppressed,omitempty"`
-	ObservedGeneration      int64     `json:"observedGeneration,omitempty"`
-	SnoozedUntil            time.Time `json:"snoozedUntil,omitempty,omitzero"`
-	StatusRevision          string    `json:"statusRevision,omitempty"`
+	NotificationsSuppressed *bool `json:"notificationsSuppressed,omitempty"`
+	ObservedGeneration      int64 `json:"observedGeneration,omitempty"`
+
+	// RecoveryAdmission Read-only policy assessment at observedAt. It grants no execution permission; writes and starts recheck authority, revisions, cooldowns and fences. Capacity and storage availability are reported separately.
+	RecoveryAdmission *RecoveryAdmission `json:"recoveryAdmission,omitempty"`
+	RecoveryDecision  *RecoveryDecision  `json:"recoveryDecision,omitempty"`
+	SnoozedUntil      time.Time          `json:"snoozedUntil,omitempty,omitzero"`
+	StatusRevision    string             `json:"statusRevision,omitempty"`
 
 	// SuppressionObservedAt UTC time of the controller suppression assessment. Clients must not recompute maintenance from their clocks.
 	SuppressionObservedAt *time.Time `json:"suppressionObservedAt,omitempty"`
@@ -1968,6 +2057,7 @@ type Outcome struct {
 	DiagnosticTruncated bool            `json:"diagnosticTruncated"`
 	Evidence            []string        `json:"evidence"`
 	ExecutionID         string          `json:"executionID"`
+	Failure             *WorkerFailure  `json:"failure,omitempty"`
 	GrantID             string          `json:"grantID"`
 	Kind                string          `json:"kind"`
 	RejectionCode       string          `json:"rejectionCode"`
@@ -2323,7 +2413,10 @@ type PulseUDPConfig struct {
 type Queue struct {
 	Available   bool        `json:"available"`
 	AverageWait Measurement `json:"averageWait,omitempty"`
-	Capacity    int64       `json:"capacity"`
+
+	// AwaitingReconciliation Completed notification dispatches retaining reservations until owner reconciliation.
+	AwaitingReconciliation *int64 `json:"awaitingReconciliation,omitempty"`
+	Capacity               int64  `json:"capacity"`
 
 	// CompletedPerSecond Absent when completed-execution rate is not measured; consult completedRateAvailable.
 	CompletedPerSecond     float64 `json:"completedPerSecond,omitempty"`
@@ -2394,6 +2487,36 @@ type RecipientSpec struct {
 	EndpointRefs []string `json:"endpointRefs"`
 }
 
+// RecoveryAdmission Read-only policy assessment at observedAt. It grants no execution permission; writes and starts recheck authority, revisions, cooldowns and fences. Capacity and storage availability are reported separately.
+type RecoveryAdmission struct {
+	AttemptLimit int `json:"attemptLimit"`
+	AttemptsUsed int `json:"attemptsUsed"`
+
+	// Deadline Original execution deadline; absent before first committed start for new actions.
+	Deadline *time.Time `json:"deadline,omitempty"`
+
+	// NotBefore Earliest time allowed by the observed cooldown; not a reservation.
+	NotBefore  *time.Time `json:"notBefore,omitempty"`
+	ObservedAt time.Time  `json:"observedAt"`
+	Reason     string     `json:"reason"`
+}
+
+// RecoveryDecision defines model for RecoveryDecision.
+type RecoveryDecision struct {
+	CandidateRuleID       string `json:"candidateRuleID,omitempty"`
+	ConfigurationRevision string `json:"configurationRevision"`
+	DecisionRevision      string `json:"decisionRevision"`
+	ObservationID         string `json:"observationID"`
+
+	// QualificationReason Qualification from committed observations, separate from permission to execute.
+	QualificationReason    string             `json:"qualificationReason,omitempty"`
+	QualifyingObservations int                `json:"qualifyingObservations"`
+	Reason                 string             `json:"reason"`
+	RequiredObservations   int                `json:"requiredObservations"`
+	Selected               *RecoverySelection `json:"selected,omitempty"`
+	TaxonomyVersion        string             `json:"taxonomyVersion"`
+}
+
 // RecoveryFailure Original committed recovery failure that caused this notification. Provider response bodies, targets and credentials are excluded.
 type RecoveryFailure struct {
 	ActionID    string                 `json:"actionID"`
@@ -2414,14 +2537,42 @@ type RecoveryFailureOutcome string
 // RecoveryFailureTrigger defines model for RecoveryFailure.Trigger.
 type RecoveryFailureTrigger string
 
+// RecoveryRule defines model for RecoveryRule.
+type RecoveryRule struct {
+	Driver *DriverConfig `json:"driver,omitempty"`
+	ID     string        `json:"id"`
+	Match  FailureMatch  `json:"match"`
+
+	// None Explicit no-intervention decision. Exactly one of none=true or driver is required.
+	None bool `json:"none,omitempty"`
+}
+
+// RecoverySelection defines model for RecoverySelection.
+type RecoverySelection struct {
+	ConfigurationRevision string `json:"configurationRevision"`
+	DecisionRevision      string `json:"decisionRevision"`
+	Driver                string `json:"driver"`
+	IncidentID            string `json:"incidentID"`
+	ObservationID         string `json:"observationID"`
+	RuleID                string `json:"ruleID"`
+}
+
 // RecoverySpec defines model for RecoverySpec.
 type RecoverySpec struct {
 	// Cooldown Go duration string, e.g. 60s. Never numeric nanoseconds or ISO-8601.
-	Cooldown    *Duration    `json:"cooldown,omitempty"`
-	Driver      DriverConfig `json:"driver"`
+	Cooldown *Duration `json:"cooldown,omitempty"`
+
+	// Driver Single recovery action. Mutually exclusive with rules.
+	Driver      DriverConfig `json:"driver,omitempty,omitzero"`
 	MaxAttempts *int64       `json:"maxAttempts,omitempty"`
 	MaxFailures *int64       `json:"maxFailures,omitempty"`
 	Retries     *int64       `json:"retries,omitempty"`
+
+	// Rules Ordered first match. No match means no intervention. Cannot be combined with driver.
+	Rules []RecoveryRule `json:"rules,omitzero"`
+
+	// TaxonomyVersion Required for rules. Pins failure codes and prefix expansion; changing it requires explicit configuration application.
+	TaxonomyVersion string `json:"taxonomyVersion,omitempty"`
 }
 
 // ResolutionNotice Resolution of an earlier exposed episode. RecoveredAt belongs to that episode; health describes the latest committed observation at start eligibility.
@@ -2684,7 +2835,21 @@ type Version struct {
 type WorkerCapability struct {
 	JobTypeID string `json:"jobTypeID"`
 	Kind      string `json:"kind"`
-	Version   string `json:"version"`
+
+	// ProtocolVersion Omitted means protocol 1. Protocol 2 explicitly supports structured check failures.
+	ProtocolVersion string `json:"protocolVersion,omitempty"`
+	Version         string `json:"version"`
+}
+
+// WorkerFailure defines model for WorkerFailure.
+type WorkerFailure struct {
+	CertificateDaysRemaining *int       `json:"certificateDaysRemaining,omitempty"`
+	CertificateNotAfter      *time.Time `json:"certificateNotAfter,omitempty"`
+	Code                     string     `json:"code"`
+	GRPCCode                 *string    `json:"grpcCode,omitempty"`
+	GRPCStatus               *string    `json:"grpcStatus,omitempty"`
+	HTTPStatus               *int       `json:"httpStatus,omitempty"`
+	Phase                    string     `json:"phase"`
 }
 
 // WorkerNotification Committed notification context, separate from operator parameters. No provider credential is supplied. Format 2 adds an earlier-episode resolution with its recovery timestamp and current observed health.

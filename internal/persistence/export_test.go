@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -44,3 +45,27 @@ func ForceFollowerForTest(t testing.TB, store *Store) func() {
 
 // RaftLeaderForTest observes election state independently of recorded store faults.
 func RaftLeaderForTest(store *Store) bool { return store.raft.State() == raft.Leader }
+
+// ExecutorStatusForTest observes claim removal without repairing a retained claim.
+func ExecutorStatusForTest(store *Store) LocalExecutorStatus { return store.localExecutorStatus() }
+
+// HoldReturnedForTest delays bookkeeping after an actual executor return. It
+// neither changes the recorded time nor substitutes the provider result.
+func HoldReturnedForTest(t testing.TB, store *Store, monitorID, actionID string) (time.Time, func()) {
+	t.Helper()
+	store.executorMu.Lock()
+	handle := store.executors[localExecutionKey(monitorID, actionID)]
+	store.executorMu.Unlock()
+	if handle == nil || handle.returnedAt.Load() == nil {
+		t.Fatal("executor has not actually returned")
+	}
+	select {
+	case handle.serial <- struct{}{}:
+	case <-time.After(time.Second):
+		t.Fatal("completion serialization did not become available")
+	}
+	var once sync.Once
+	release := func() { once.Do(func() { <-handle.serial }) }
+	t.Cleanup(release)
+	return *handle.returnedAt.Load(), release
+}

@@ -110,7 +110,7 @@ func TestStoppedBackupRestoreAfterActionRetirement(t *testing.T) {
 	var manifest struct {
 		StateFormat int `json:"state_format"`
 	}
-	if err := json.Unmarshal(raw, &manifest); err != nil || manifest.StateFormat != persistence.NotificationConditionFormatVersion {
+	if err := json.Unmarshal(raw, &manifest); err != nil || manifest.StateFormat != persistence.DispatchFormatVersion {
 		t.Fatal("backup did not preserve the committed built-in format", manifest.StateFormat, err)
 	}
 	if err := Restore(backup, destination, key); err != nil {

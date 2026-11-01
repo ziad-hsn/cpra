@@ -28,8 +28,9 @@
 // The journal uses an exclusive directory lock and synchronous encrypted writes.
 // Preserve the complete stopped state directory and its matching key separately.
 // Missing keys, incompatible server or worker UID, and corrupted state fail
-// explicitly. Journal format 2 binds these identities into encryption AAD.
-// Format 1 is rejected without migration or removal of existing records.
+// explicitly. Journal format 3 binds these identities into encryption AAD.
+// Format 2 requires explicit stopped conversion with [ConvertJournal]; startup
+// does not convert it. Format 1 is rejected without removal of existing records.
 //
 // Run owns its goroutines and journal lock until all handlers have exited. It
 // installs no signal handler and never exits the process. Handlers must honor

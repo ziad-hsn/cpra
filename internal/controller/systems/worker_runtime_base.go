@@ -27,14 +27,14 @@ func (*DurableSystem) checkpointWorkerSchedules(commands []persistence.Command, 
 	return commands
 }
 
-func (*DurableSystem) initWorkerDispatch(*management.Catalog)                   {}
-func (*DurableSystem) startWorkerDispatch()                                     {}
-func (*DurableSystem) stopWorkerDispatch()                                      {}
-func (*DurableSystem) finishWorkerDispatch()                                    {}
-func (*DurableSystem) receiveWorkerDispatch()                                   {}
-func (*DurableSystem) workerNeedsUpdate() bool                                  { return false }
-func (*DurableSystem) workerCheck(ecs.Entity) bool                              { return false }
-func (*DurableSystem) dispatchWorkerAction(ecs.Entity, persistence.Action) bool { return false }
+func (*DurableSystem) initWorkerDispatch(*management.Catalog)                        {}
+func (*DurableSystem) startWorkerDispatch()                                          {}
+func (*DurableSystem) stopWorkerDispatch()                                           {}
+func (*DurableSystem) finishWorkerDispatch()                                         {}
+func (*DurableSystem) receiveWorkerDispatch()                                        {}
+func (*DurableSystem) workerNeedsUpdate() bool                                       { return false }
+func (*DurableSystem) workerCheck(ecs.Entity) bool                                   { return false }
+func (*DurableSystem) dispatchWorkerAction(ecs.Entity, persistence.Action, int) bool { return false }
 
 func (*DurableSystem) dispatchWorkerChecks()        {}
 func (*DurableSystem) cancelWorkerCheck(ecs.Entity) {}

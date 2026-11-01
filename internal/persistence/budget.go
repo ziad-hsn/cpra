@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"reflect"
@@ -98,7 +99,11 @@ func encodedBound(value any) (int, error) {
 	return maxCommitBytes - remaining, nil
 }
 
-var jsonTimeType = reflect.TypeFor[time.Time]()
+var (
+	jsonTimeType          = reflect.TypeFor[time.Time]()
+	jsonRecoveryRulesType = reflect.TypeFor[RecoveryRules]()
+	jsonMarshalerType     = reflect.TypeFor[json.Marshaler]()
+)
 
 func consumeJSON(v reflect.Value, remaining *int) bool {
 	use := func(n int) bool {
@@ -113,6 +118,20 @@ func consumeJSON(v reflect.Value, remaining *int) bool {
 	}
 	if v.Type() == jsonTimeType {
 		return use(64) // More than the longest valid quoted RFC3339Nano value.
+	}
+	if v.Type() == jsonRecoveryRulesType && v.CanInterface() {
+		rules := v.Interface().(RecoveryRules)
+		if rules.IsZero() {
+			return use(4)
+		}
+		// The immutable JSON is already bounded at construction. Account for
+		// its actual wire representation without copying or marshaling it.
+		return use(len(rules.data.encoded))
+	}
+	if v.Kind() != reflect.Pointer && (v.Type().Implements(jsonMarshalerType) || reflect.PointerTo(v.Type()).Implements(jsonMarshalerType)) {
+		// A new custom representation needs an explicit bounded accounting
+		// rule; reflection over its public fields is not its JSON contract.
+		return false
 	}
 	switch v.Kind() {
 	case reflect.Pointer:

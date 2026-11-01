@@ -32,6 +32,7 @@ var (
 // protected file outside DataDirectory. No command accepts an existing token.
 type AuthenticationRequest struct {
 	Action, DataDirectory, PrincipalID, Role, TokenOutput string
+	Mode                                                  string
 	ExpiresAt                                             *time.Time
 }
 
@@ -156,7 +157,7 @@ func administerAuthentication(ctx context.Context, request AuthenticationRequest
 		defer clear(bearer)
 		base64.RawURLEncoding.Encode(bearer, entropy[:])
 		digest := sha256.Sum256(bearer)
-		if request.Action == "rotate-read-token" {
+		if request.Action == "rotate-read-token" || request.Action == "reprovision" && request.Mode == "observation" {
 			command.LegacyTokenSHA256 = hex.EncodeToString(digest[:])
 		} else {
 			command.Principals[index].TokenSHA256 = hex.EncodeToString(digest[:])
@@ -189,6 +190,9 @@ func administerAuthentication(ctx context.Context, request AuthenticationRequest
 }
 
 func validateAuthenticationRequest(r AuthenticationRequest, at time.Time) error {
+	if r.Mode != "" && (r.Action != "reprovision" || r.Mode != "management" && r.Mode != "observation") {
+		return &authenticationError{"--mode must select management or observation for post-restore reprovisioning", ErrAuthenticationInput}
+	}
 	if !filepath.IsAbs(r.DataDirectory) || strings.ContainsAny(r.DataDirectory, "\x00\r\n") || rejectSymlinkAncestors(r.DataDirectory) != nil {
 		return &authenticationError{"--data-dir must identify an explicit absolute directory without symbolic links", ErrAuthenticationInput}
 	}
@@ -202,7 +206,8 @@ func validateAuthenticationRequest(r AuthenticationRequest, at time.Time) error 
 		}
 		return nil
 	}
-	if r.Action == "rotate-read-token" {
+	observation := r.Action == "reprovision" && r.Mode == "observation"
+	if r.Action == "rotate-read-token" || observation {
 		if r.PrincipalID != "" || r.Role != "" || r.ExpiresAt != nil {
 			return ErrAuthenticationInput
 		}
@@ -214,7 +219,7 @@ func validateAuthenticationRequest(r AuthenticationRequest, at time.Time) error 
 	}
 	switch r.Action {
 	case "bootstrap", "issue", "reprovision":
-		if r.Role != "reader" && r.Role != "operator" {
+		if !observation && r.Role != "reader" && r.Role != "operator" {
 			return &authenticationError{"--role must explicitly select reader or operator", ErrAuthenticationInput}
 		}
 	case "rotate":
@@ -265,8 +270,12 @@ func prepareAuthenticationCommand(current persistence.AuthenticationState, reque
 			}
 			command.Mode = "provision"
 		}
-		command.Principals = []persistence.AuthenticationPrincipal{{ID: request.PrincipalID, Role: request.Role}}
 		command.LegacyTokenSHA256 = ""
+		if request.Action == "reprovision" && request.Mode == "observation" {
+			command.Principals = nil
+			return command, -1, nil
+		}
+		command.Principals = []persistence.AuthenticationPrincipal{{ID: request.PrincipalID, Role: request.Role}}
 		if request.ExpiresAt != nil {
 			command.Principals[0].ExpiresAt = request.ExpiresAt.UTC()
 		}

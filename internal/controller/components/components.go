@@ -10,6 +10,7 @@ import (
 
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/manifest"
+	"github.com/ziad-hsn/cpra/internal/persistence"
 )
 
 // Disabled is a zero-size tag component marking an entity as disabled.
@@ -151,6 +152,7 @@ func (m *MonitorState) SetCodePending(pending bool) {
 
 // PulseConfig consolidates pulse configuration
 type PulseConfig struct {
+	TargetBinding                   string
 	FlowKey                         uint64
 	TargetSummary                   string
 	CertificateVerificationDisabled bool
@@ -187,6 +189,8 @@ func (c *PulseConfig) Copy() *PulseConfig {
 
 // InterventionConfig consolidates intervention configuration
 type InterventionConfig struct {
+	Rules       persistence.RecoveryRules
+	Choices     []manifest.InterventionRule
 	MaxAttempts int
 	Target      manifest.InterventionTarget
 	Action      string
@@ -198,6 +202,8 @@ func (c *InterventionConfig) Copy() *InterventionConfig {
 		return nil
 	}
 	cpy := &InterventionConfig{
+		Rules:       c.Rules,
+		Choices:     manifest.CloneInterventionRules(c.Choices),
 		Action:      strings.Clone(c.Action),
 		MaxAttempts: c.MaxAttempts,
 		MaxFailures: c.MaxFailures,
@@ -217,12 +223,13 @@ type CodeConfig struct {
 }
 
 type ColorCodeConfig struct {
-	EndpointIDs []string
-	Trigger     string
-	Config      manifest.CodeNotification
-	Notify      string
-	MaxFailures int
-	Dispatch    bool
+	EndpointBindings []string
+	EndpointIDs      []string
+	Trigger          string
+	Config           manifest.CodeNotification
+	Notify           string
+	MaxFailures      int
+	Dispatch         bool
 }
 
 func (c *ColorCodeConfig) Copy() *ColorCodeConfig {
@@ -230,11 +237,12 @@ func (c *ColorCodeConfig) Copy() *ColorCodeConfig {
 		return nil
 	}
 	cpy := &ColorCodeConfig{
-		EndpointIDs: slices.Clone(c.EndpointIDs),
-		Dispatch:    c.Dispatch,
-		MaxFailures: c.MaxFailures,
-		Notify:      strings.Clone(c.Notify),
-		Trigger:     strings.Clone(c.Trigger),
+		EndpointIDs:      slices.Clone(c.EndpointIDs),
+		EndpointBindings: slices.Clone(c.EndpointBindings),
+		Dispatch:         c.Dispatch,
+		MaxFailures:      c.MaxFailures,
+		Notify:           strings.Clone(c.Notify),
+		Trigger:          strings.Clone(c.Trigger),
 	}
 	if c.Config != nil {
 		cpy.Config = c.Config.Copy()
@@ -319,11 +327,15 @@ func (c *CodeStatus) Copy() *CodeStatus {
 // JobStorage consolidates all job storage instead of separate job components.
 // This single component replaces PulseJob, InterventionJob, CodeJob, etc.
 type ActionFlow struct {
+	Digest string
 	Driver string
 	Key    uint64
 }
 
 type JobStorage struct {
+	InterventionPreparationAction string
+	InterventionPreparationRetry  time.Time
+	InterventionRuleBinding       string
 	jobStorageExtensions
 	InterventionFlow ActionFlow
 	CodeFlows        map[string][]ActionFlow
@@ -337,10 +349,11 @@ func (j *JobStorage) Copy() *JobStorage {
 		return nil
 	}
 	cpy := &JobStorage{
-		jobStorageExtensions: j.jobStorageExtensions.clone(),
-		CodeJobs:             make(map[string][]jobs.Job),
-		InterventionFlow:     j.InterventionFlow,
-		CodeFlows:            make(map[string][]ActionFlow, len(j.CodeFlows)),
+		jobStorageExtensions:    j.jobStorageExtensions.clone(),
+		InterventionRuleBinding: j.InterventionRuleBinding,
+		CodeJobs:                make(map[string][]jobs.Job),
+		InterventionFlow:        j.InterventionFlow,
+		CodeFlows:               make(map[string][]ActionFlow, len(j.CodeFlows)),
 	}
 	for color, flows := range j.CodeFlows {
 		cpy.CodeFlows[color] = slices.Clone(flows)

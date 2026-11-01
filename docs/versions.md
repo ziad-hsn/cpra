@@ -27,6 +27,7 @@ to their actual source inventories. They are not a final frozen-release pass.
 | SDK and workers | Separate Go modules; external workers require build tag, runtime enablement and scoped credentials | Public downloaded-module qualification and publication remain open |
 | Check latency | Observed rolling distributions and threshold attainment; model plus bounded feedback | Estimates and measurements do not establish an unconditional SLA |
 | Drivers | 14 checks, six recovery roles and 15 notification roles across applicable build tags | Fixture contracts, provider acceptance and observed real effects are distinct evidence levels |
+| Intervention rules | Ordered monitor-local rules select one action from a versioned typed failure; unmatched observations select none | Qualification and committed starts enforce existing attempt, deadline, suppression and unknown-effect safeguards; see [the rules guide](intervention-rules.md) |
 | gRPC | TCP reachability when mode is omitted; explicit verified-TLS unary health mode | Only SERVING succeeds in health mode; it never falls back to TCP |
 | Distributions | Go-install contract, archive/package/image/Compose/Helm recipes and local administration | Native OS/architecture, service, filesystem and deployment matrices remain required |
 | Build compatibility | Common Go 1.26.10 minimum; release compiler Go 1.27.3 | Final-source compiler, driver-tag, vulnerability and reproducibility checks remain required |

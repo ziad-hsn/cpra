@@ -94,6 +94,7 @@ func validateAgentStart(c Command) error {
 	extra.ActionDeadline = time.Time{}
 	extra.NoticeRevision = ""
 	extra.AgentConnection = nil
+	extra.NotificationPermit = nil
 	if extra != (Command{}) {
 		return ErrAgentActionInvalid
 	}

@@ -17,7 +17,9 @@ func additionalReferences(item Item, add func(string, string) error) error {
 		}
 		drivers = append(drivers, spec.Check.Driver)
 		if spec.Recovery != nil {
-			drivers = append(drivers, spec.Recovery.Driver)
+			if err := api.VisitRecoveryDrivers(spec.Recovery, func(_ string, driver *api.DriverConfig) error { drivers = append(drivers, *driver); return nil }); err != nil {
+				return err
+			}
 		}
 		if spec.Notifications != nil {
 			for _, rule := range *spec.Notifications {

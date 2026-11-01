@@ -1,22 +1,46 @@
 import { lazy, Suspense, useState } from 'react';
-import { createBrowserRouter, RouterProvider, Routes, Route, Link } from 'react-router-dom';
+import { onlineManager } from '@tanstack/react-query';
+import { createBrowserRouter, RouterProvider, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { LoadingSkeleton } from './components/LoadingSkeleton';
 import { SessionBoundary } from './auth/SessionBoundary';
 import { useOnlineStatus } from './hooks/connection';
+import { PageBoundary } from './components/PageBoundary';
 import './styles/global.css';
 import './styles/management.css';
 
-const Overview = lazy(() => import('./pages/Overview'));
-const Monitors = lazy(() => import('./pages/Monitors'));
-const MonitorDetail = lazy(() => import('./pages/MonitorDetail'));
-const MonitorState = lazy(() => import('./pages/MonitorState'));
-const Alerts = lazy(() => import('./pages/Alerts'));
-const SystemHealth = lazy(() => import('./pages/SystemHealth'));
-const Settings = lazy(() => import('./pages/Settings'));
-const OperationDetail = lazy(() => import('./pages/OperationDetail'));
-const ManagementResources = lazy(() => import('./pages/ManagementResources'));
-const CollectionImport = lazy(() => import('./pages/CollectionImport'));
+function importPage<T>(load: () => Promise<T>): Promise<T> {
+  // Avoid poisoning the browser module cache when offline is already known.
+  // An explicit retry creates a new lazy wrapper and can load after reconnect.
+  if (!onlineManager.isOnline()) return Promise.reject(new Error('Page unavailable while offline'));
+  return load();
+}
+
+function createPages() {
+  return {
+    Overview: lazy(() => importPage(() => import('./pages/Overview'))),
+    Monitors: lazy(() => importPage(() => import('./pages/Monitors'))),
+    MonitorDetail: lazy(() => importPage(() => import('./pages/MonitorDetail'))),
+    MonitorState: lazy(() => importPage(() => import('./pages/MonitorState'))),
+    Alerts: lazy(() => importPage(() => import('./pages/Alerts'))),
+    SystemHealth: lazy(() => importPage(() => import('./pages/SystemHealth'))),
+    Settings: lazy(() => importPage(() => import('./pages/Settings'))),
+    OperationDetail: lazy(() => importPage(() => import('./pages/OperationDetail'))),
+    ManagementResources: lazy(() => importPage(() => import('./pages/ManagementResources'))),
+    CollectionImport: lazy(() => importPage(() => import('./pages/CollectionImport'))),
+  };
+}
+
+function PageFailure({retry, exhausted}: {retry: () => void; exhausted: boolean}) {
+  const online = useOnlineStatus();
+  return <section className="page route-failure">
+    <div className="page-head"><h1>{online ? 'This page could not be loaded' : 'You are offline'}</h1></div>
+    <p>{online ? 'Navigation and your current sign-in remain available.' : 'Reconnect before retrying. Saved observations may be stale.'}</p>
+    <p>Retrying this page does not repeat submitted changes. Check the original operation before submitting a change again.</p>
+    <div className="row"><button className="btn" disabled={!online || exhausted} onClick={retry}>Retry page</button><Link className="btn" to="/">Go to overview</Link></div>
+    {exhausted && <p>Page retries are exhausted. You can use another page or reload the dashboard and sign in again.</p>}
+  </section>;
+}
 
 function PageFallback() {
   const online = useOnlineStatus();
@@ -48,7 +72,20 @@ function NotFound() {
 
 /** AppRoutes — the routes without a router wrapper, for testing. */
 export function AppRoutes() {
+  const {pathname} = useLocation();
+  const [pages, setPages] = useState(createPages);
+  const [retryState, setRetryState] = useState({path: '', count: 0, generation: 0});
+  const count = retryState.path === pathname ? retryState.count : 0;
+  const {Overview, Monitors, MonitorDetail, MonitorState, Alerts, SystemHealth, Settings, OperationDetail, ManagementResources, CollectionImport} = pages;
+  const retry = () => {
+    if (count >= 3) return;
+    // React.lazy caches a rejected promise. A fresh wrapper is necessary for
+    // an explicit retry; the surrounding session and caches are untouched.
+    setPages(createPages());
+    setRetryState({path: pathname, count: count + 1, generation: retryState.generation + 1});
+  };
   return (
+    <PageBoundary resetKey={`${pathname}:${retryState.generation}`} fallback={<PageFailure retry={retry} exhausted={count >= 3} />}>
     <Suspense fallback={<PageFallback />}>
       <Routes>
         <Route path="/" element={<Overview />} />
@@ -68,6 +105,7 @@ export function AppRoutes() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
+    </PageBoundary>
   );
 }
 

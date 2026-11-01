@@ -134,6 +134,134 @@ func TestControllerRetainsInFlightPulseAcrossRaftElection(t *testing.T) {
 	}
 }
 
+func TestControllerRetainsNotificationOutcomeUntilCompletionReconciles(t *testing.T) {
+	controller.InitializeLoggers(false)
+	t.Cleanup(controller.CloseLoggers)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	var invocations atomic.Int64
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		if invocations.Add(1) == 1 {
+			close(entered)
+			select {
+			case <-release:
+			case <-r.Context().Done():
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(target.Close)
+	t.Cleanup(unblock)
+	settings := runtimeconfig.Default()
+	settings.Storage.Directory = filepath.Join(t.TempDir(), "state")
+	store, err := persistence.Open(t.Context(), settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	cfg := controller.DefaultConfig()
+	cfg.Store, cfg.Runtime = store, settings
+	cfg.StreamingConfig.PreAllocateCount = 0
+	cfg.WorkerConfig.MinWorkers, cfg.WorkerConfig.MaxWorkers, cfg.WorkerConfig.NumShards = 1, 1, 1
+	cfg.WorkerConfig.ResultBatchSize, cfg.WorkerConfig.ResultBatchTimeout = 1, time.Millisecond
+	owner := controller.NewController(cfg)
+	t.Cleanup(func() {
+		unblock()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := owner.StopContext(ctx); err != nil {
+			t.Error(err)
+		}
+	})
+	path := filepath.Join(t.TempDir(), "monitors.yaml")
+	input := fmt.Sprintf("monitors:\n  - id: completion-election\n    name: Completion election\n    pulse_check:\n      type: http\n      interval: 41s\n      timeout: 5s\n      unhealthy_threshold: 1\n      healthy_threshold: 1\n      config: {url: %q}\n    codes:\n      red:\n        dispatch: true\n        notify: webhook\n        config: {url: %q}\n", target.URL+"/health", target.URL+"/notification")
+	if err := os.WriteFile(path, []byte(input), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	if err := owner.LoadMonitors(ctx, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.WaitReady(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("notification did not reach receiver")
+	}
+	m, ok := store.Get("completion-election")
+	if !ok {
+		t.Fatal("monitor missing")
+	}
+	var actionID string
+	for _, a := range m.Actions {
+		if a.Kind == "code" && a.State == persistence.Started {
+			actionID = a.ID
+		}
+	}
+	if actionID == "" {
+		t.Fatal("receiver effect lacks committed start")
+	}
+	restoreElection := persistence.ForceFollowerForTest(t, store)
+	unblock()
+	waitControllerRecovery(t, "notification returned while follower", func() bool { return owner.CodePool().Stats().TasksCompleted == 1 })
+	completedAt, releaseCompletion := persistence.HoldReturnedForTest(t, store, m.ID, actionID)
+	before, _ := store.Get(m.ID)
+	if before.Actions[actionID].State != persistence.Started || !before.Actions[actionID].ExecutorFinishedAt.IsZero() || owner.Ready() {
+		t.Fatal("unresolved completion was presented as available")
+	}
+	restoreElection()
+	waitControllerRecovery(t, "store leader restored", func() bool { return store.Status().Ready })
+	progress, _ := owner.Metrics().GetSystemMetrics("DurableSystem")
+	waitControllerRecovery(t, "controller observed blocked completion", func() bool {
+		current, ok := owner.Metrics().GetSystemMetrics("DurableSystem")
+		return ok && current.TotalUpdates >= progress.TotalUpdates+2
+	})
+	if owner.Ready() || invocations.Load() != 1 {
+		t.Fatal("admission reopened or effect repeated before completion reconciliation")
+	}
+	rows, total := owner.SnapshotHolder().Index().Page(0, 1, nil)
+	if total != 1 || len(rows) != 1 {
+		t.Fatal("monitor observation missing during reconciliation")
+	}
+	view := owner.SnapshotHolder().Observation(rows[0])
+	if view.Health != "unknown" || view.Availability.State != "unavailable" || view.LastObservedHealth != "unhealthy" || view.LastObservedAt.IsZero() || !view.Incident {
+		t.Fatalf("blocked completion obscured monitoring availability or past facts: %+v", view)
+	}
+	releaseCompletion()
+	waitControllerRecovery(t, "original result committed and admission resumed", func() bool {
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+		defer cancel()
+		a, found, err := store.ActionContext(ctx, actionID)
+		return err == nil && found && a.State == persistence.Succeeded && owner.Ready()
+	})
+	read, cancelRead := context.WithTimeout(t.Context(), time.Second)
+	defer cancelRead()
+	a, _, err := store.ActionContext(read, actionID)
+	if err != nil || !a.ExecutorFinishedAt.Equal(completedAt) || invocations.Load() != 1 {
+		t.Fatal("original executor timestamp or one-effect boundary changed", err)
+	}
+	status := persistence.ExecutorStatusForTest(store)
+	if status.Running != 0 || status.Returned != 0 {
+		t.Fatal("committed completion retained an executor claim", status)
+	}
+}
+
 func TestControllerStartupFollowerRemainsUnavailableAfterElection(t *testing.T) {
 	controller.InitializeLoggers(false)
 	t.Cleanup(controller.CloseLoggers)

@@ -29,7 +29,7 @@ func TestWorkerSLODefaultExclusion(t *testing.T) {
 			}
 		}
 	}
-	if supportedFormat(25) || LatestFormatVersion != ActionFormatVersion {
+	if supportedFormat(25) || LatestFormatVersion != DispatchFormatVersion {
 		t.Fatal("default format changed")
 	}
 }

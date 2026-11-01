@@ -135,7 +135,8 @@ func TestWorkerOfferSelectionReplay(t *testing.T) {
 			}
 			snapshot := captureSnapshotBytes(t, s.fsm)
 			if selection == 1 && !bytes.HasPrefix(snapshot, []byte(actionWorkerSnapshotMagic)) {
-				t.Fatal("queue snapshot did not carry its format")
+				header, _, _ := bytes.Cut(snapshot, []byte("\n"))
+				t.Fatalf("queue snapshot did not retain format 45: %q", header)
 			}
 			if err := replayed.Restore(io.NopCloser(bytes.NewReader(snapshot))); err != nil {
 				t.Fatal(err)
@@ -154,10 +155,10 @@ func TestWorkerOfferSelectionFormat(t *testing.T) {
 		poll.ProposedLeaseIDs = append(poll.ProposedLeaseIDs, uuid.NewString())
 	}
 	command := Command{Kind: "worker_poll", At: time.Now().UTC(), commandExtensions: commandExtensions{WorkerSession: &poll}}
-	for version := 1; version <= WorkerQueueFormatVersion+1; version++ {
+	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion || version == WorkerNotificationConditionFormatVersion || version == WorkerRecoveryRulesFormatVersion || version == WorkerDispatchFormatVersion) {
 			t.Fatalf("selection format %d: %v", version, err)
 		}
 	}

@@ -213,6 +213,9 @@ func (s *Store) FinishReturnedExecutions(ctx context.Context) error {
 
 func (f *machine) applyExecutorCommand(c Command) Result {
 	if c.Kind == "local_session" {
+		if c.ExecutorSession != f.image.LocalExecutorSession {
+			f.resetNotificationReservations(c.At)
+		}
 		f.image.LocalExecutorSession = c.ExecutorSession
 		f.image.Version = max(f.image.Version, CatalogFormatVersion)
 		return Result{Allowed: true}

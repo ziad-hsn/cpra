@@ -15,7 +15,7 @@ import type { CpraCode } from '../theme/tokens';
 export default function Alerts() {
   const access = useAccess();
   const session = useDashboardSession();
-  if (access.phase !== 'authenticated') return <LegacyAlerts />;
+  if (access.phase !== 'authenticated' && !session.can('ListIncidents')) return <LegacyAlerts />;
   return <div className="page"><div className="page-head"><div><h1>Alerts &amp; Incidents</h1><div className="lead">Incident attention and notification state</div></div></div>
     {session.can('ListIncidents') ? <IncidentsList /> : <p role="status">Your identity cannot list incidents.</p>}
   </div>;

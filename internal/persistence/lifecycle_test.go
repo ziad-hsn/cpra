@@ -144,7 +144,7 @@ func TestRestartInterventionRequiresFreshObservation(t *testing.T) {
 				t.Fatal("restored recovery started without a new observation")
 			}
 			raw := captureSnapshotBytes(t, s.fsm)
-			if !bytes.HasPrefix(raw, []byte(actionSnapshotMagic)) {
+			if !bytes.HasPrefix(raw, []byte(dispatchSnapshotMagic)) {
 				t.Fatal("restart barrier lost its format")
 			}
 			if err := s.fsm.Restore(io.NopCloser(bytes.NewReader(raw))); err != nil {

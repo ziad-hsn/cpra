@@ -30,7 +30,9 @@ type History struct {
 }
 
 type Notifications struct {
-	LogDirectory string `yaml:"log_directory,omitempty" json:"-"`
+	Pacing       map[string]NotificationPacing `yaml:"pacing,omitempty" json:"-"`
+	Concurrency  map[string]int                `yaml:"concurrency,omitempty" json:"concurrency,omitempty"`
+	LogDirectory string                        `yaml:"log_directory,omitempty" json:"-"`
 }
 
 type Web struct {
@@ -111,6 +113,9 @@ func (c Config) Validate() error {
 		if err != nil || numberErr != nil || number < 1 || number > 65535 {
 			return fmt.Errorf("web.address requires a host and port from 1 through 65535")
 		}
+	}
+	if err := c.Notifications.Validate(); err != nil {
+		return err
 	}
 	if c.Notifications.LogDirectory != "" && !filepath.IsAbs(c.Notifications.LogDirectory) {
 		return fmt.Errorf("notifications.log_directory must be absolute")

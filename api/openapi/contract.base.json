@@ -1248,8 +1248,49 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "pending",
+                "closed"
+              ],
+              "x-go-type": "string"
+            }
+          },
+          {
+            "name": "acknowledged",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "dismissed",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "triage",
+                "id"
+              ],
+              "default": "triage",
+              "x-go-type": "string"
+            }
           }
-        ]
+        ],
+        "description": "Frozen latest episode per monitor. Filters and ordering are bound to the cursor. Triage orders open, pending, closed; undismissed before dismissed; unacknowledged before acknowledged; oldest first-failure timestamp, then ID. Sparse filters can return empty pages with an advancing cursor. Earlier episodes remain in history."
       }
     },
     "/api/v2/incidents/{id}": {

@@ -112,6 +112,18 @@ func ValidateResource(r Resource) error {
 	switch r.Kind {
 	case "Monitor":
 		var spec MonitorSpec
+		// Custom unmarshallers report paths relative to their own object. Add
+		// the known recovery boundary before decoding the complete monitor.
+		var sections map[string]json.RawMessage
+		if err := StrictDecode(r.Spec, &sections); err != nil {
+			return PrefixValidationError("spec", err)
+		}
+		if raw := sections["recovery"]; len(raw) > 0 && !bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+			var recovery RecoverySpec
+			if err := StrictDecode(raw, &recovery); err != nil {
+				return PrefixValidationError("spec.recovery", err)
+			}
+		}
 		if err := StrictDecode(r.Spec, &spec); err != nil {
 			return PrefixValidationError("spec", err)
 		}
@@ -125,7 +137,11 @@ func ValidateResource(r Resource) error {
 			}
 		}
 		if spec.Recovery != nil {
-			if err := ValidateDriver("recovery", spec.Recovery.Driver); err != nil {
+			if spec.Recovery.Rules != nil || spec.Recovery.TaxonomyVersion != "" {
+				if err := ValidateRecoverySettings(spec.Check.Driver, spec.Recovery); err != nil {
+					return PrefixValidationError("spec.recovery", err)
+				}
+			} else if err := ValidateDriver("recovery", spec.Recovery.Driver); err != nil {
 				return PrefixValidationError("spec.recovery.driver", err)
 			}
 		}
@@ -260,7 +276,7 @@ func ValidateDriver(category string, d DriverConfig) error {
 func NormalizeManifestDriver(category, kind string, raw json.RawMessage) (json.RawMessage, error) {
 	target := driverTarget(category, kind)
 	if target == nil {
-		return nil, ErrUnsupportedDriver
+		return nil, errors.Join(ErrUnsupportedDriver, InvalidField("type", "unsupportedDriver"))
 	}
 	var fields map[string]json.RawMessage
 	if err := StrictDecode(raw, &fields); err != nil {

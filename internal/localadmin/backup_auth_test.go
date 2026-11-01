@@ -27,7 +27,7 @@ func backupTestKey(t *testing.T, root string) string {
 	return path
 }
 func TestBackupManifestAuthenticationRejectsReplacement(t *testing.T) {
-	root := t.TempDir()
+	root := backupCollectionRoot(t)
 	key := backupTestKey(t, root)
 	source, backup := filepath.Join(root, "state"), filepath.Join(root, "backup")
 	cfg := runtimeconfig.Default()
@@ -51,7 +51,7 @@ func TestBackupManifestAuthenticationRejectsReplacement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wrongRoot := t.TempDir()
+	wrongRoot := backupCollectionRoot(t)
 	wrongKey := backupTestKey(t, wrongRoot)
 	for _, tc := range []struct{ name, key string }{{"missing", ""}, {"wrong", wrongKey}} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -124,7 +124,7 @@ func TestBackupManifestAuthenticationRejectsReplacement(t *testing.T) {
 	}
 }
 func TestBackupKeyMustBeExternalToBothTrees(t *testing.T) {
-	root := t.TempDir()
+	root := backupCollectionRoot(t)
 	external := backupTestKey(t, root)
 	source, destination := filepath.Join(root, "state"), filepath.Join(root, "backup")
 	for _, dir := range []string{source, destination} {
@@ -164,7 +164,7 @@ func TestBackupKeyMustBeExternalToBothTrees(t *testing.T) {
 func TestBackupRequiresExactProtectedKey(t *testing.T) {
 	for _, length := range []int{0, 31, 33} {
 		t.Run(strconv.Itoa(length), func(t *testing.T) {
-			root := t.TempDir()
+			root := backupCollectionRoot(t)
 			key := backupTestKey(t, root)
 			if err := os.WriteFile(key, bytes.Repeat([]byte{17}, length), 0600); err != nil {
 				t.Fatal(err)
@@ -177,7 +177,7 @@ func TestBackupRequiresExactProtectedKey(t *testing.T) {
 	}
 }
 func TestServiceUpdateValidatesBackupKeyBeforeCandidateOrSupervisor(t *testing.T) {
-	root := t.TempDir()
+	root := backupCollectionRoot(t)
 	layout := installpath.Layout{Scope: "system", BinDir: filepath.Join(root, "bin"), ConfigDir: filepath.Join(root, "config"), StateDir: filepath.Join(root, "state")}
 	for _, dir := range []string{layout.BinDir, layout.ConfigDir} {
 		if err := os.Mkdir(dir, 0700); err != nil {

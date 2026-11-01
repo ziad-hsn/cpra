@@ -15,6 +15,7 @@ import (
 	"github.com/ziad-hsn/cpra/internal/jobs"
 	"github.com/ziad-hsn/cpra/internal/management"
 	"github.com/ziad-hsn/cpra/internal/persistence"
+	"github.com/ziad-hsn/cpra/internal/queue"
 	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
 	"github.com/ziad-hsn/cpra/sdk/go/api"
@@ -57,6 +58,56 @@ func projectionRecoveryOwner(t *testing.T) (*DurableSystem, *management.Catalog)
 	s.catalogRuntime = &catalogRuntime{catalog: catalog, store: store, mapper: entities.NewEntityManager(&world), known: map[string]bool{}, updates: make(chan catalogProjection, 1), ctx: ctx, cancel: cancel}
 	s.managed = make(map[string]managedMonitor)
 	return s, catalog
+}
+
+func TestDeletedCatalogMonitorCancelsPausedNotificationsWithoutTouchingReplacement(t *testing.T) {
+	s, catalog := projectionRecoveryOwner(t)
+	resource := commitProjectionResource(t, catalog, projectionRecoveryResource(t, "paused-delete", "http://127.0.0.1:1"))
+	initial := prepareRecoveryProjection(t, s, resource.Metadata.ID)
+	s.startCatalogProjection(initial)
+	assertProjectionAck(t, initial, nil)
+	q, err := queue.NewActionQueue(32, "notification")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.queues["code"] = q
+	ent := s.entities[resource.Metadata.ID]
+	old := jobs.NewDispatch(s.jobs.Get(ent).PulseJob, ent, "code", "red", 0, 0)
+	old.Driver, old.MonitorID, old.ActionID = "webhook", resource.Metadata.ID, "old-action"
+	old.ConfigureNotificationPacing("shared-private-destination", 0, "")
+	q.SetNotificationRates(map[string]jobs.NotificationRateState{old.RateScopes[0].ID: {NotBefore: time.Now().Add(24 * time.Hour)}})
+	if err := q.Enqueue(old); err != nil {
+		t.Fatal(err)
+	}
+	removed := deleteRecoveryMonitor(t, s, resource)
+	if err := s.removeCatalogProjection(t.Context(), *removed.removed); err != nil {
+		t.Fatal(err)
+	}
+	if !old.CancelledBeforeStart() {
+		t.Fatal("deleted monitor retained paused work")
+	}
+	job, err := q.Dequeue()
+	if err != nil || job == nil {
+		t.Fatal(err)
+	}
+	if result := job.Execute(); !errors.Is(result.Err, context.Canceled) || !result.ExecutionStart.IsZero() {
+		t.Fatal("cancelled deletion invoked target")
+	}
+	if q.Stats().QueueDepth != 0 {
+		t.Fatal("deletion leaked queue slot")
+	}
+	resource = commitProjectionResource(t, catalog, projectionRecoveryResource(t, resource.Metadata.ID, "http://127.0.0.1:1/replacement"))
+	current := prepareRecoveryProjection(t, s, resource.Metadata.ID)
+	s.startCatalogProjection(current)
+	assertProjectionAck(t, current, nil)
+	newEntry := jobs.NewDispatch(s.jobs.Get(s.entities[resource.Metadata.ID]).PulseJob, ent, "code", "red", 0, 0)
+	newEntry.Driver, newEntry.MonitorID, newEntry.ActionID = "webhook", resource.Metadata.ID, "new-action"
+	if err := q.Enqueue(newEntry); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.removeCatalogProjection(t.Context(), *removed.removed); !errors.Is(err, persistence.ErrCatalogDependency) || newEntry.CancelledBeforeStart() {
+		t.Fatal("old tombstone canceled replacement", err)
+	}
 }
 
 func projectionRecoveryResource(t *testing.T, id, target string) api.Resource {
@@ -393,11 +444,15 @@ func TestOwnerProjectionRecoveryFreezesSnoozeExpiry(t *testing.T) {
 
 type corruptedOwnerReply struct {
 	*lostOwnerReply
-	corrupt func(*persistence.Result, persistence.Command)
+	corrupt    func(*persistence.Result, persistence.Command)
+	wrongCount bool
 }
 
 func (w *corruptedOwnerReply) Submit(ctx context.Context, commands []persistence.Command) ([]persistence.Result, error) {
 	results, err := w.lostOwnerReply.Submit(ctx, commands)
+	if err == nil && w.wrongCount {
+		return nil, nil
+	}
 	if err == nil && len(results) > 0 && commands[0].Kind == w.kind {
 		i := len(results) - 1
 		if results[i].Monitor != nil {
@@ -407,6 +462,22 @@ func (w *corruptedOwnerReply) Submit(ctx context.Context, commands []persistence
 		w.corrupt(&results[i], commands[i])
 	}
 	return results, err
+}
+
+func TestOwnerMalformedResultCountIsPermanentAndRetainsOwnership(t *testing.T) {
+	s, catalog := projectionRecoveryOwner(t)
+	resource := commitProjectionResource(t, catalog, projectionRecoveryResource(t, "malformed-count", "http://127.0.0.1:1"))
+	projection := prepareRecoveryProjection(t, s, resource.Metadata.ID)
+	writer := &corruptedOwnerReply{lostOwnerReply: &lostOwnerReply{store: s.store, kind: "configure", lost: true}, wrongCount: true}
+	s.committer = writer
+	s.startCatalogProjection(projection)
+	if !errors.Is(s.lastError, errOwnerProjection) || s.pendingWrite == nil || s.AdmissionReady() || s.store.Status().Ready {
+		t.Fatal("malformed success reply became a retry loop", s.lastError)
+	}
+	assertProjectionUnacknowledged(t, projection)
+	if len(s.entities) != 0 {
+		t.Fatal("invalid reply published jobs")
+	}
 }
 
 func TestOwnerExpiryMalformedReplyRetainsEntireProjectionBatch(t *testing.T) {

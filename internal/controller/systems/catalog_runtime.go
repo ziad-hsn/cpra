@@ -328,7 +328,7 @@ func (s *DurableSystem) finishCatalogWrite(ctx context.Context, p *ownerWrite) e
 	var err error
 	if len(p.results) != 0 {
 		if p.results[0].Err != nil && p.results[0].Monitor != nil {
-			return persistence.ErrCommitUnconfirmed
+			return errOwnerProjection
 		}
 		err = p.results[0].Err
 	}
@@ -345,11 +345,11 @@ func (s *DurableSystem) finishCatalogWrite(ctx context.Context, p *ownerWrite) e
 			err = s.store.CheckCatalogGuardContext(ctx, id, &guard)
 			if err == nil && !p.installed {
 				if len(p.results) != 1 || p.results[0].Monitor == nil {
-					return management.ErrOutcomeUnconfirmed
+					return errOwnerProjection
 				}
 				m := p.results[0].Monitor
 				if m.ID != id || m.CatalogUID != update.runtime.MonitorUID || m.CatalogRevision != update.runtime.ResourceVersion || m.Revision != update.runtime.ExecutionRevision || m.Removed {
-					return persistence.ErrCommitUnconfirmed
+					return errOwnerProjection
 				}
 				p.installed = true
 				err = s.installCatalogProjection(ctx, update, *m)
@@ -376,7 +376,9 @@ func (s *DurableSystem) catalogConfigureCommand(update catalogProjection) persis
 	p := update.runtime
 	id := update.prepared.MonitorID()
 	guard := persistence.CatalogGuard{Conditions: slices.Clone(p.Conditions)}
-	policy := persistence.Policy{Interval: p.Monitor.Pulse.Interval, Unhealthy: p.Monitor.Pulse.UnhealthyThreshold, Healthy: max(1, p.Monitor.Pulse.HealthyThreshold), Intervention: p.Monitor.Intervention.Action != "", Enabled: p.Monitor.Enabled, Cooldown: s.cooldown, RecoveryBypass: s.recoveryBypass, Endpoints: map[string]int{}}
+	policy := persistence.Policy{NotificationBindings: map[string][]string{}, Interval: p.Monitor.Pulse.Interval, Unhealthy: p.Monitor.Pulse.UnhealthyThreshold, Healthy: max(1, p.Monitor.Pulse.HealthyThreshold), Intervention: p.Monitor.Intervention.Action != "", Enabled: p.Monitor.Enabled, Cooldown: s.cooldown, RecoveryBypass: s.recoveryBypass, Endpoints: map[string]int{}}
+	policy.RecoveryRules = update.prepared.RecoveryRules()
+	policy.Intervention = policy.Intervention || !policy.RecoveryRules.IsZero()
 	if p.Monitor.AutoIgnore != nil {
 		window, _ := time.ParseDuration(p.Monitor.AutoIgnore.Window) // Static validation preceded preparation.
 		policy.AutoIgnore = &persistence.AutoIgnorePolicy{Incidents: int(p.Monitor.AutoIgnore.Incidents), Window: window}
@@ -417,6 +419,17 @@ func (s *DurableSystem) catalogConfigureCommand(update catalogProjection) persis
 				if !strings.HasPrefix(target.EndpointID, "$inline/") {
 					policy.NotificationEndpointIDs[color] = append(policy.NotificationEndpointIDs[color], target.EndpointUID+"/"+preparedIDs[ordinal])
 				}
+			}
+			stableBindings := update.prepared.NotificationBindings(color)
+			for ordinal, endpoint := range policy.NotificationEndpointIDs[color] {
+				if ordinal < len(stableBindings) {
+					endpoint = p.NotificationTargets[color][ordinal].EndpointUID + "/" + stableBindings[ordinal]
+				}
+				credential := ""
+				if ordinal < len(p.NotificationCredentials[color]) {
+					credential = p.NotificationCredentials[color][ordinal]
+				}
+				policy.NotificationBindings[color] = append(policy.NotificationBindings[color], persistence.NotificationBinding(update.prepared.CheckBinding(), endpoint, credential))
 			}
 			setRecoveryNotification(&policy, color, c.Trigger, p.Monitor.Intervention.Action)
 		}
@@ -535,6 +548,11 @@ func (s *DurableSystem) removeCatalogProjection(ctx context.Context, record pers
 	}
 	if !ok || !current.Removed || current.UID != record.UID || current.Revision != record.Revision {
 		return persistence.ErrCatalogDependency
+	}
+	if q, ok := s.queues["code"].(interface {
+		CancelPending(string, func(string) bool)
+	}); ok {
+		q.CancelPending(record.Key.ID, func(string) bool { return false })
 	}
 	if ent, exists := s.entities[record.Key.ID]; exists {
 		s.cancelSchedules(ent, record.Key.ID)

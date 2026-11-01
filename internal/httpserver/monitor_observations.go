@@ -13,7 +13,10 @@ import (
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
-type monitorObservationView struct{ view fleetview.View }
+type monitorObservationView struct {
+	view         fleetview.View
+	availability fleetview.MonitorAvailability
+}
 
 func (v monitorObservationView) Page(ctx context.Context, selection, after string, limit int) ([]api.MonitorObservation, string, error) {
 	rows, next, err := v.view.Page(ctx, selection, after, limit)
@@ -22,7 +25,7 @@ func (v monitorObservationView) Page(ctx context.Context, selection, after strin
 	}
 	items := make([]api.MonitorObservation, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, monitorObservation(row))
+		items = append(items, monitorObservation(fleetview.WithControllerAvailability(row, v.availability)))
 	}
 	return items, next, nil
 }
@@ -41,12 +44,13 @@ func monitorObservation(row fleetview.MonitorSummary) api.MonitorObservation {
 		latency.Value, latency.Reason = row.LatencyMs, ""
 	}
 	colors := append([]string{}, row.ActiveCodes...)
-	out := api.MonitorObservation{
+	out := api.MonitorObservation{RecoveryDecision: row.RecoveryDecision, RecoveryAdmission: row.RecoveryAdmission,
 		MonitorID: row.MonitorID, IncarnationUID: row.IncarnationUID, NumericID: int64(row.ID),
 		Name: row.Name, Source: api.MonitorObservationSource(row.Source), CheckType: row.PulseType,
 		Target: row.Target, IntervalMS: row.IntervalMs, Health: api.MonitorObservationHealth(row.Health),
 		Phase: api.MonitorObservationPhase(row.Phase), Enabled: row.Enabled, Ignored: row.Ignored,
 		ConfiguredNotifications: colors, PendingNotifications: int64(row.PendingNotifications),
+		CancelledNotifications: api.Pointer(int64(row.CancelledNotifications)),
 		CompletedNotifications: int64(row.CompletedNotifications), FailedNotifications: int64(row.FailedNotifications),
 		UnknownNotifications: int64(row.UnknownNotifications), UnknownActions: int64(row.UnknownActions), ActionsNeedingReview: int64(row.ActionsNeedingReview),
 		LastCheckLatencyMS: latency, MissedChecks: int64(row.MissedChecks), QueueRejections: int64(row.QueueRejections),
@@ -74,14 +78,16 @@ func monitorObservation(row fleetview.MonitorSummary) api.MonitorObservation {
 	for _, reason := range row.ConfigurationWarnings {
 		if reason == "unknownRecoveryDestination" {
 			out.Warnings = append(out.Warnings, api.FieldError{Field: "spec.notifications.blue", Reason: reason, Message: api.ValidationMessage(reason)})
+		} else if reason == "recoveryOnlyCoverage" {
+			out.Warnings = append(out.Warnings, api.FieldError{Field: "spec.notifications.red.trigger", Reason: reason, Message: api.ValidationMessage(reason)})
 		}
 	}
 	if row.ConfigurationProblem.Code != "" {
-		out.ConfigurationProblem = &api.FailureDiagnostic{Code: row.ConfigurationProblem.Code, Message: row.ConfigurationProblem.Message}
+		out.ConfigurationProblem = &api.FailureDiagnostic{Code: row.ConfigurationProblem.Code, Message: row.ConfigurationProblem.Message, Phase: row.ConfigurationProblem.Phase, TaxonomyVersion: row.ConfigurationProblem.TaxonomyVersion}
 	}
 	if row.LastFailure.Code != "" {
 		d := row.LastFailure
-		out.LastFailure = &api.FailureDiagnostic{Code: d.Code, Message: d.Message}
+		out.LastFailure = &api.FailureDiagnostic{Code: d.Code, Message: d.Message, Phase: d.Phase, TaxonomyVersion: d.TaxonomyVersion}
 		if d.HTTPStatus != 0 {
 			out.LastFailure.HTTPStatus = &d.HTTPStatus
 		}
@@ -160,7 +166,7 @@ func (s *Server) registerMonitorObservations(mux *http.ServeMux, m *managementHT
 				if index == nil {
 					return management.ErrUnavailable
 				}
-				entry.monitors = monitorObservationView{view: index.Snapshot()}
+				entry.monitors = monitorObservationView{view: index.Snapshot(), availability: s.holder.ControllerAvailability()}
 			}
 			items, after, err := entry.monitors.Page(ctx, entry.monitorID, read.cursor.After, entry.limit)
 			if err != nil {
@@ -199,7 +205,7 @@ func (s *Server) registerMonitorObservations(mux *http.ServeMux, m *managementHT
 			if err != nil {
 				return err
 			}
-			result = monitorObservation(row)
+			result = monitorObservation(s.holder.Observation(row))
 			return ctx.Err()
 		})
 		if err != nil {

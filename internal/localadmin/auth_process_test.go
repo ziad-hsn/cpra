@@ -292,3 +292,52 @@ func TestReadTokenRotationPersistsInRealStoreAndRequiresStoppedOwner(t *testing.
 		t.Fatal("existing private output was overwritten", err)
 	}
 }
+
+func TestRealRestoredObservationReprovision(t *testing.T) {
+	directory, output := authTestPaths(t)
+	initial, err := AdministerAuthentication(t.Context(), AuthenticationRequest{Action: "bootstrap", DataDirectory: directory, PrincipalID: "old", Role: "operator", TokenOutput: output})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backup, restored := directory+"-backup", directory+"-restored"
+	key := backupTestKey(t, filepath.Dir(directory))
+	if err := Backup(directory, backup, "", key); err != nil {
+		t.Fatal(err)
+	}
+	if err := Restore(backup, restored, key); err != nil {
+		t.Fatal(err)
+	}
+	reset, err := AdministerAuthentication(t.Context(), AuthenticationRequest{Action: "list", DataDirectory: restored})
+	if err != nil || !reset.ResetRequired || reset.Epoch == initial.Epoch {
+		t.Fatal("missing restore fence", err)
+	}
+	fresh := filepath.Join(filepath.Dir(output), "restored-reader.token")
+	provisioned, err := AdministerAuthentication(t.Context(), AuthenticationRequest{Action: "reprovision", Mode: "observation", DataDirectory: restored, TokenOutput: fresh})
+	if err != nil || provisioned.ResetRequired || provisioned.Epoch != reset.Epoch || len(provisioned.Principals) != 0 || !provisioned.LegacyReadEnabled {
+		t.Fatal("observation provision", provisioned, err)
+	}
+	config := runtimeconfig.Default()
+	config.Storage.Directory = restored
+	store, err := persistence.OpenAdministrative(t.Context(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	authority, err := store.Authentication()
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := assertAuthToken(t, fresh, authority.LegacyTokenSHA256)
+	defer clear(token)
+	if len(authority.Principals) != 0 || authority.AnonymousLoopback || authority.ResetRequired || authority.Epoch != reset.Epoch {
+		t.Fatal("restored authority changed mode or resurrected grants")
+	}
+	old, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(old)
+	if bytes.Equal(bytes.TrimSpace(old), token) {
+		t.Fatal("old bearer resurrected")
+	}
+}

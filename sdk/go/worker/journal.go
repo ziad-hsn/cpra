@@ -3,9 +3,11 @@
 package worker
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -21,7 +23,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-const journalFormat = 2
+const journalFormat = 3
 
 // At most sixteen 256-byte identity fields with worst-case JSON escaping, plus
 // fixed fields/framing. This is separate from the already encoded outcome cap.
@@ -40,18 +42,22 @@ type encryptedRecord struct {
 	Nonce, Ciphertext []byte
 }
 type journalRecord struct {
-	ExecutionID string
-	WorkerUID   string
-	JobTypeUID  string
-	TargetUID   string
-	Start       api.StartRequest
-	Kind        string
-	GrantID     string
-	State       string
-	Deadline    time.Time
-	Outcome     *api.Outcome
-	ReceiptID   string
-	Evidence    *api.LateEvidenceRequest
+	ProtocolVersion string   `json:",omitempty"`
+	JobTypeID       string   `json:",omitempty"`
+	JobTypeVersion  string   `json:",omitempty"`
+	FailureCodes    []string `json:",omitempty"`
+	ExecutionID     string
+	WorkerUID       string
+	JobTypeUID      string
+	TargetUID       string
+	Start           api.StartRequest
+	Kind            string
+	GrantID         string
+	State           string
+	Deadline        time.Time
+	Outcome         *api.Outcome
+	ReceiptID       string
+	Evidence        *api.LateEvidenceRequest
 }
 
 // journal.mu protects key epochs, closing, and every accounting transaction.
@@ -59,6 +65,8 @@ type journalRecord struct {
 type journal struct {
 	mu          sync.Mutex
 	db          *bolt.DB
+	file        *os.File
+	directory   os.FileInfo
 	path        string
 	meta        journalMetadata
 	wrapping    cipher.AEAD
@@ -89,6 +97,18 @@ func (a journalAccounting) replace(previous, next journalAccounting) journalAcco
 }
 
 func openJournal(c Config) (*journal, error) {
+	return openJournalFormat(c, journalFormat, false)
+}
+
+// A conversion opener never initializes or rotates a key in the old journal.
+func openJournalFormat(c Config, format int, conversion bool) (*journal, error) {
+	return openJournalContext(context.Background(), c, format, conversion)
+}
+
+func openJournalContext(ctx context.Context, c Config, format int, conversion bool) (*journal, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if !filepath.IsAbs(c.StateDir) || !filepath.IsAbs(c.WrappingKeyPath) {
 		return nil, errors.New("worker state and key paths must be absolute")
 	}
@@ -126,8 +146,10 @@ func openJournal(c Config) (*journal, error) {
 	if err = rejectSymlinks(state); err != nil {
 		return nil, err
 	}
-	if err = makePrivateDir(state); err != nil {
-		return nil, err
+	if !conversion {
+		if err = makePrivateDir(state); err != nil {
+			return nil, err
+		}
 	}
 	if err = checkPrivate(state, true); err != nil {
 		return nil, err
@@ -138,6 +160,9 @@ func openJournal(c Config) (*journal, error) {
 	}
 	existing := true
 	if info, statErr := os.Stat(path); statErr == nil {
+		if conversion && info.Size() > c.Limits.AllocatedBytes {
+			return nil, ErrCapacity
+		}
 		if err = checkPrivate(path, false); err != nil {
 			return nil, err
 		}
@@ -147,6 +172,9 @@ func openJournal(c Config) (*journal, error) {
 	} else if !os.IsNotExist(statErr) {
 		return nil, statErr
 	} else {
+		if conversion {
+			return nil, ErrJournalVersion
+		}
 		// Own first creation explicitly. A crash before initialization leaves an
 		// existing empty file which is rejected, never silently bootstrapped.
 		file, createErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -158,7 +186,21 @@ func openJournal(c Config) (*journal, error) {
 		}
 		existing = false
 	}
-	db, err := bolt.Open(path, 0600, &bolt.Options{Timeout: 100 * time.Millisecond})
+	directory, err := os.Stat(state)
+	if err != nil {
+		return nil, err
+	}
+	var opened *os.File
+	db, err := bolt.Open(path, 0600, &bolt.Options{Timeout: 100 * time.Millisecond, OpenFile: func(name string, flag int, mode os.FileMode) (*os.File, error) {
+		if conversion {
+			flag &^= os.O_CREATE
+		}
+		f, e := os.OpenFile(name, flag, mode)
+		if e == nil {
+			opened = f
+		}
+		return f, e
+	}})
 	if err != nil {
 		return nil, fmt.Errorf("open exclusively locked worker journal: %w", err)
 	}
@@ -176,8 +218,16 @@ func openJournal(c Config) (*journal, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	j := &journal{db: db, path: path, wrapping: wrap, keys: make(map[string]cipher.AEAD), limits: c.Limits}
-	err = db.Update(func(tx *bolt.Tx) error {
+	j := &journal{db: db, file: opened, directory: directory, path: path, wrapping: wrap, keys: make(map[string]cipher.AEAD), limits: c.Limits}
+	if err = j.checkIdentity(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	transaction := db.Update
+	if conversion {
+		transaction = db.View
+	}
+	err = transaction(func(tx *bolt.Tx) error {
 		var e error
 		meta := tx.Bucket(metadataBucket)
 		if existing {
@@ -199,8 +249,11 @@ func openJournal(c Config) (*journal, error) {
 			}
 		}
 		raw := meta.Get([]byte("identity"))
+		if len(raw) > 4096 {
+			return ErrCorrupt
+		}
 		if raw == nil {
-			j.meta = journalMetadata{Format: journalFormat, ID: randomID(), ServerID: c.ServerID, WorkerID: c.WorkerID, WorkerUID: c.WorkerUID}
+			j.meta = journalMetadata{Format: format, ID: randomID(), ServerID: c.ServerID, WorkerID: c.WorkerID, WorkerUID: c.WorkerUID}
 			identity, e := json.Marshal(j.meta)
 			if e != nil {
 				return e
@@ -217,7 +270,7 @@ func openJournal(c Config) (*journal, error) {
 		if e = json.Unmarshal(raw, &j.meta); e != nil {
 			return fmt.Errorf("%w: metadata", ErrCorrupt)
 		}
-		if j.meta.Format != journalFormat {
+		if j.meta.Format != format {
 			return fmt.Errorf("%w: %d; existing records require operator reconciliation", ErrJournalVersion, j.meta.Format)
 		}
 		if j.meta.ID == "" || j.meta.ServerID != c.ServerID || j.meta.WorkerID != c.WorkerID || j.meta.WorkerUID != c.WorkerUID {
@@ -227,7 +280,18 @@ func openJournal(c Config) (*journal, error) {
 		if e != nil || string(proof) != "cpra-worker-key-check" {
 			return fmt.Errorf("%w: wrong wrapping key or altered identity", ErrCorrupt)
 		}
+		epochs := 0
 		return tx.Bucket(epochsBucket).ForEach(func(k, v []byte) error {
+			if e := ctx.Err(); e != nil {
+				return e
+			}
+			epochs++
+			if conversion && epochs > c.Limits.Records+1 {
+				return ErrCapacity
+			}
+			if len(k) > 64 || len(v) > 512 {
+				return ErrCorrupt
+			}
 			plain, e := unseal(j.wrapping, v, j.aad("epoch", string(k)))
 			if e != nil {
 				return fmt.Errorf("%w: epoch", ErrCorrupt)
@@ -248,16 +312,25 @@ func openJournal(c Config) (*journal, error) {
 	if err == nil {
 		err = db.View(func(tx *bolt.Tx) error {
 			return tx.Bucket(recordsBucket).ForEach(func(k, v []byte) error {
+				if e := ctx.Err(); e != nil {
+					return e
+				}
+				if conversion && (j.accounting.records >= c.Limits.Records || len(v) > encodedJournalRecordLimit(c.Limits)) {
+					return ErrCapacity
+				}
 				r, err := j.decode(string(k), v)
 				if err != nil {
 					return err
 				}
 				j.accounting = j.accounting.replace(journalAccounting{}, recordAccounting(r, j.limits))
+				if conversion && j.accounting.liveBytes+j.accounting.reservedBytes > c.Limits.LiveBytes {
+					return ErrCapacity
+				}
 				return nil
 			})
 		})
 	}
-	if err == nil {
+	if err == nil && !conversion {
 		err = j.rotateEpoch()
 	}
 	if err != nil {
@@ -265,6 +338,36 @@ func openJournal(c Config) (*journal, error) {
 		return nil, fmt.Errorf("initialize worker journal: %w", err)
 	}
 	return j, nil
+}
+
+// Unknown actions may retain both an outcome and late evidence. Both envelope
+// limits apply before AEAD, then encoding/json base64-encodes the ciphertext.
+func encodedJournalRecordLimit(l Limits) int {
+	return base64.StdEncoding.EncodedLen(2*l.OutcomeBytes+journalMetadataReserve+16) + 256
+}
+
+// Verify the opened database and its private parent still have the identities
+// owned by this runner. Do not continue conversion against a substituted path.
+func (j *journal) checkIdentity() error {
+	if err := rejectSymlinks(j.path); err != nil {
+		return err
+	}
+	current, err := os.Stat(j.path)
+	if err != nil {
+		return err
+	}
+	held, err := j.file.Stat()
+	if err != nil {
+		return err
+	}
+	parent, err := os.Stat(filepath.Dir(j.path))
+	if err != nil {
+		return err
+	}
+	if !os.SameFile(held, current) || !os.SameFile(j.directory, parent) {
+		return ErrIdentity
+	}
+	return checkPrivate(j.path, false)
 }
 
 func randomID() string { var b [16]byte; _, _ = rand.Read(b[:]); return hex.EncodeToString(b[:]) }
@@ -386,6 +489,12 @@ func (j *journal) decode(id string, b []byte) (journalRecord, error) {
 		if r.Outcome == nil || r.Outcome.ServerID != j.meta.ServerID || r.Outcome.WorkerUID != j.meta.WorkerUID || r.Outcome.ExecutionID != id || r.Outcome.Kind != r.Kind || r.Outcome.GrantID != r.GrantID || !validOutcome(r.Kind, r.Outcome.Status) {
 			return r, ErrCorrupt
 		}
+		if !recordFailureValid(r, *r.Outcome) {
+			return r, ErrCorrupt
+		}
+	}
+	if r.ProtocolVersion != "" && r.ProtocolVersion != "1" && r.ProtocolVersion != "2" || r.ProtocolVersion == "2" && (j.meta.Format != 3 || r.Kind != "check" || !validID(r.JobTypeID) || !validID(r.JobTypeVersion) || api.ValidateJobTypeFailures(api.JobTypeSpec{Kind: r.Kind, ProtocolVersion: r.ProtocolVersion, FailureCodes: r.FailureCodes}) != nil) {
+		return r, ErrCorrupt
 	}
 	if r.State == "unknown" && r.ReceiptID == "" {
 		return r, ErrCorrupt
@@ -544,6 +653,9 @@ func (j *journal) reserve(a api.Assignment) error {
 			return ErrCapacity
 		}
 		r := journalRecord{ExecutionID: a.ExecutionID, WorkerUID: a.WorkerUID, JobTypeUID: a.JobTypeUID, TargetUID: a.IncarnationUID, Start: api.StartRequest{ServerID: a.ServerID, SessionID: a.SessionID, Mode: api.StartModeReconcile, ExecutionID: a.ExecutionID, LeaseID: a.LeaseID, ExecutionRevision: a.ExecutionRevision}, Kind: a.Kind, State: "reserved", Deadline: a.Deadline}
+		if a.ProtocolVersion == "2" {
+			r.ProtocolVersion, r.JobTypeID, r.JobTypeVersion, r.FailureCodes = a.ProtocolVersion, a.JobTypeID, a.JobTypeVersion, append([]string(nil), a.FailureCodes...)
+		}
 		encoded, err := j.encode(r)
 		if err != nil {
 			return err

@@ -25,7 +25,7 @@ const actions = {
   recover: { title: 'Request recovery', permission: 'RecoverMonitor', description: 'Request the configured recovery for the current unhealthy target. CPRa checks maintenance, active or unresolved work, cooldowns and attempt limits before admitting it. This can change the monitored service.' },
 } as const;
 
-interface FrozenControl { action: Action; monitorID: string; monitorUID: string; revision: string; incidentID?: string }
+interface FrozenControl { action: Action; monitorID: string; monitorUID: string; revision: string; incidentID?: string; ruleID?: string; decisionRevision?: string; configurationRevision?: string }
 
 function validSnoozeDuration(input: string): boolean {
   const duration = input.trim().replace(/^\+/, '');
@@ -70,13 +70,18 @@ export function MonitorControls({ monitorID }: { monitorID: string }) {
   const writesUnavailable = mutation.pending || mutation.error?.reason === 'unconfirmed' || resource.isError;
   const until = monitor?.status?.snoozedUntil;
   const snoozed = typeof until === 'string' && Number.isFinite(Date.parse(until)) && Date.parse(until) > Date.now();
+  const ruleDecision = monitor?.status?.recoveryDecision;
+  const usesRules = !!monitor?.spec.recovery?.rules;
+  const ruleQualified = !!ruleDecision?.candidateRuleID && (ruleDecision.qualificationReason || ruleDecision.reason) === 'qualified' && !!ruleDecision.decisionRevision && !!ruleDecision.configurationRevision && ruleDecision.qualifyingObservations >= ruleDecision.requiredObservations && ruleDecision.requiredObservations > 0;
+  const admissionBlocked = !!monitor?.status?.recoveryAdmission && monitor.status.recoveryAdmission.reason !== 'eligible';
   const begin = (action: Action) => {
     if (!monitor || writesUnavailable || !session.can(actions[action].permission)) return;
     const isIncident = action === 'acknowledge' || action === 'dismiss' || action === 'reopen';
     const revision = isIncident ? currentIncident?.revision : action === 'disable' || action === 'enable' ? monitor.metadata.resourceVersion : monitor.status?.controlRevision;
     if (!revision || !monitor.metadata.uid || (isIncident && !currentIncident)) return;
+    if (action === 'recover' && (admissionBlocked || usesRules && !ruleQualified)) return;
     mutation.clearFeedback();
-    setDraft({ action, monitorID, monitorUID: monitor.metadata.uid, revision, ...(isIncident ? { incidentID: currentIncident!.id } : {}) });
+    setDraft({ action, monitorID, monitorUID: monitor.metadata.uid, revision, ...(isIncident ? { incidentID: currentIncident!.id } : {}), ...(action === 'recover' && usesRules && ruleDecision ? { ruleID: ruleDecision.candidateRuleID, decisionRevision: ruleDecision.decisionRevision, configurationRevision: ruleDecision.configurationRevision } : {}) });
   };
   const submit = async (input: { reason: string; note: string; duration: string }) => {
     if (!draft || mutation.pending || mutation.error?.reason === 'unconfirmed') return;
@@ -86,7 +91,7 @@ export function MonitorControls({ monitorID }: { monitorID: string }) {
       } else {
         const path = draft.incidentID ? `/api/v2/incidents/${encodeURIComponent(draft.incidentID)}/${draft.action}` : `/api/v2/monitors/${encodeURIComponent(draft.monitorID)}/${draft.action}`;
         await mutation.execute(path, { operation: actions[draft.action].permission, method: 'POST', resourceVersion: draft.revision,
-          body: { revision: draft.revision, ...(draft.incidentID ? { incidentID: draft.incidentID } : {}), ...(input.note.trim() ? { note: input.note.trim() } : {}), ...(input.reason.trim() ? { reason: input.reason.trim() } : {}), ...(draft.action === 'snooze' ? { duration: input.duration.trim() } : {}) } });
+          body: { revision: draft.revision, ...(draft.incidentID ? { incidentID: draft.incidentID } : {}), ...(draft.ruleID ? { ruleID: draft.ruleID, decisionRevision: draft.decisionRevision, configurationRevision: draft.configurationRevision } : {}), ...(input.note.trim() ? { note: input.note.trim() } : {}), ...(input.reason.trim() ? { reason: input.reason.trim() } : {}), ...(draft.action === 'snooze' ? { duration: input.duration.trim() } : {}) } });
       }
       setDraft(undefined);
       await queries.invalidateQueries({ queryKey: ['management'] });
@@ -113,7 +118,7 @@ export function MonitorControls({ monitorID }: { monitorID: string }) {
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         {currentIncident && (['acknowledge', currentIncident.dismissed ? 'reopen' : 'dismiss'] as Action[]).map(action => session.can(actions[action].permission) && <button key={action} className="btn" disabled={writesUnavailable} onClick={() => begin(action)}>{actions[action].title}</button>)}
         {(['snooze', ...(snoozed ? ['unsnooze'] : []), monitor.status?.ignored ? 'unignore' : 'ignore', monitor.spec.enabled === false ? 'enable' : 'disable'] as Action[]).map(action => session.can(actions[action].permission) && <button key={action} className="btn" disabled={writesUnavailable || !monitor.metadata.uid || ((action !== 'disable' && action !== 'enable') && !monitor.status?.controlRevision)} onClick={() => begin(action)}>{actions[action].title}</button>)}
-        {session.can('RecoverMonitor') && monitor.spec.recovery && <button className="btn" disabled={writesUnavailable || !monitor.metadata.uid || !monitor.status?.controlRevision || monitor.spec.enabled === false || monitor.status?.ignored || snoozed || monitor.status?.health !== 'unhealthy'} onClick={() => begin('recover')}>Request recovery</button>}
+        {session.can('RecoverMonitor') && monitor.spec.recovery && <button className="btn" disabled={writesUnavailable || !monitor.metadata.uid || !monitor.status?.controlRevision || monitor.spec.enabled === false || monitor.status?.ignored || snoozed || monitor.status?.health !== 'unhealthy' || admissionBlocked || usesRules && !ruleQualified} onClick={() => begin('recover')}>Request recovery</button>}
       </div>
       {!monitor.status?.controlRevision && <p className="muted">Snooze is unavailable until the controller publishes a control version.</p>}
     </>}
@@ -132,6 +137,7 @@ function ControlDialog({ draft, pending, unconfirmed, children, onCancel, onConf
   const textValid = [reason, note].every(text => new TextEncoder().encode(text).byteLength <= 4096 && !text.includes('\0') && !text.includes('\r'));
   return <Dialog labelledBy={heading} pending={pending} onCancel={onCancel}><form className="card" onSubmit={event => { event.preventDefault(); if (!pending && !unconfirmed && textValid && durationValid && (!needsReason || reason.trim())) void onConfirm({ reason, note, duration }); }}>
     <h2 id={heading}>{actions[draft.action].title}</h2><p>{actions[draft.action].description}</p>
+    {draft.ruleID && <p style={{ overflowWrap: 'anywhere' }}>Qualified rule: <strong>{draft.ruleID}</strong>. Decision {draft.decisionRevision}; configuration {draft.configurationRevision}. This request cannot override its failure conditions. Changed observations or controls require a new review.</p>}
     {draft.incidentID && <p className="muted">Applies to this incident only: <span className="mono">{draft.incidentID}</span></p>}
     {draft.action === 'acknowledge' && <label className="management-field">Note (optional)<textarea className="input" value={note} maxLength={4096} disabled={pending} onChange={event => setNote(event.target.value)} /></label>}
     {needsReason && <label className="management-field">Reason<textarea className="input" required value={reason} maxLength={4096} disabled={pending} onChange={event => setReason(event.target.value)} /></label>}

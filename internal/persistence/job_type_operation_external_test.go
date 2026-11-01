@@ -425,7 +425,7 @@ func TestJobTypeOperationFormatAndLegacyDigest(t *testing.T) {
 		for version := 1; version <= LatestFormatVersion+1; version++ {
 			raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 			_, err := decodeEnvelope(raw)
-			want := version >= 16 && version <= 30 || version == 32 || version == 34 || version == 36 || version == 37 || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion
+			want := version >= 16 && version <= 30 || version == 32 || version == 34 || version == 36 || version == 37 || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion || version == WorkerNotificationConditionFormatVersion || version == WorkerRecoveryRulesFormatVersion || version == WorkerDispatchFormatVersion
 			if (err == nil) != want {
 				t.Fatal("operation format bypass", command.Kind, version, err)
 			}
@@ -452,9 +452,30 @@ func TestJobTypeOperationFormatAndLegacyDigest(t *testing.T) {
 	for n := 0; n < frozen.NumField(); n++ {
 		field := frozen.Field(n)
 		other, ok := current.FieldByName(field.Name)
+		if field.Name == "Value" {
+			if !ok || field.Type != reflect.TypeFor[jobTypeVersionDigestV1]() || other.Type != reflect.TypeFor[JobTypeVersion]() || field.Tag != other.Tag {
+				t.Fatal("historical JobType value projection changed")
+			}
+			continue
+		}
 		if !ok || field.Type != other.Type || field.Tag != other.Tag {
 			t.Fatal("historical shape changed", field.Name)
 		}
+	}
+	currentValue, frozenValue := reflect.TypeFor[JobTypeVersion](), reflect.TypeFor[jobTypeVersionDigestV1]()
+	if currentValue.NumField() != frozenValue.NumField()+1 {
+		t.Fatal("unreviewed JobType value projection")
+	}
+	for n := 0; n < frozenValue.NumField(); n++ {
+		field := frozenValue.Field(n)
+		other, ok := currentValue.FieldByName(field.Name)
+		if !ok || field.Type != other.Type || field.Tag != other.Tag {
+			t.Fatal("historical JobType value field changed", field.Name)
+		}
+	}
+	field, ok := currentValue.FieldByName("FailureCodes")
+	if !ok || field.Type != reflect.TypeFor[[]string]() || field.Tag != `json:"failure_codes,omitempty"` {
+		t.Fatal("unreviewed JobType failure declaration shape")
 	}
 	// This independently pins the old serialized body, including empty encrypted
 	// envelope fields and every old optional guard, rather than hashing itself.
@@ -463,6 +484,18 @@ func TestJobTypeOperationFormatAndLegacyDigest(t *testing.T) {
 	const want = "5e5bdf9cb55c865644781e85ef26ab113b7b90e7111d3c0445af90b005772c27"
 	if got := jobTypeCommandDigest(fixed, at); got != want {
 		t.Fatalf("format15 golden %s", got)
+	}
+	structured := fixed
+	structured.Value.ProtocolVersion = "2"
+	structured.Value.FailureCodes = []string{"custom.cache.full"}
+	_, version, err := jobTypeDigestEncoding(structured)
+	if err != nil || version != "v2" || jobTypeCommandDigest(structured, at) == want {
+		t.Fatal("structured declaration used the historical digest", version, err)
+	}
+	first := jobTypeCommandDigest(structured, at)
+	structured.Value.FailureCodes = []string{"custom.cache.evicted"}
+	if jobTypeCommandDigest(structured, at) == first {
+		t.Fatal("structured digest omitted failure declarations")
 	}
 }
 

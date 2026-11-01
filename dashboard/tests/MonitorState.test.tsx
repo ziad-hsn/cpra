@@ -9,7 +9,7 @@ import { resource } from './managementFixture';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-async function fixture(options: { reader?: boolean; permissions?: string[]; unsupported?: boolean; configuration?: boolean; mismatched?: boolean; missingUID?: boolean; routeID?: string } = {}) {
+async function fixture(options: { observation?: boolean; reader?: boolean; permissions?: string[]; unsupported?: boolean; configuration?: boolean; mismatched?: boolean; missingUID?: boolean; routeID?: string } = {}) {
   const id = 'checkout:eu';
   const monitor = resource('monitors', id, { enabled: true, check: { driver: options.unsupported ? { type: 'external', config: { privatePayload: 'must-not-reach-the-dom' }, jobTypeRef: 'operator-job' } : { type: 'tcp', config: { host: 'checkout.example.test', port: 443 } }, interval: '60s', timeout: '5s' } });
   monitor.status = { controlRevision: 'control-1', executionRevision: 'execution-1', incidentID: 'incident-1', health: 'unhealthy', unknownActions: 1, lastCheckLatencyMs: { available: true, value: 0 } };
@@ -26,7 +26,7 @@ async function fixture(options: { reader?: boolean; permissions?: string[]; unsu
     const method = init?.method ?? 'GET';
     requests.push({ path, method, search: url.searchParams });
     if (path === '/api/v2/discovery') return reply({ apiVersions: ['cpra.io/v2'], resources: [], patchTypes: ['application/merge-patch+json'], drivers: { check: ['tcp'], recovery: [], notification: [] } });
-    if (path === '/api/v2/access') return new Response(JSON.stringify({ mode: 'management', authenticationRequired: true }));
+    if (path === '/api/v2/access') return new Response(JSON.stringify({ mode: options.observation ? 'observation' : 'management', authenticationRequired: true }));
     if (path === '/api/v2/self') return reply({ principalId: 'alice', role: options.reader ? 'reader' : 'operator', permissions });
     if (method !== 'GET') {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -34,6 +34,7 @@ async function fixture(options: { reader?: boolean; permissions?: string[]; unsu
       if (method === 'PATCH') monitor.spec.enabled = (body.spec as { enabled: boolean }).enabled;
       return reply(monitor);
     }
+    if (path === `/api/v2/observations/monitors/${encodeURIComponent(id)}`) return reply({ monitorID: monitor.metadata.id, incarnationUID: monitor.metadata.uid, name: monitor.metadata.name, source: 'file', numericID: 1, checkType: 'tcp', target: 'checkout.example.test:443', intervalMs: 60000, health: 'unknown', phase: 'incident', enabled: true, ignored: false, configuredNotifications: ['red'], pendingNotifications: 0, completedNotifications: 1, failedNotifications: 0, unknownNotifications: 0, unknownActions: 1, lastCheckLatencyMs: { available: true, value: 0 }, missedChecks: 0, queueRejections: 0, certificateVerificationDisabled: false, actionsNeedingReview: 1, availability: { state: 'unavailable', reason: 'controllerUnavailable' }, lastObservedHealth: 'healthy', lastObservedAt: '2026-10-28T09:00:00Z', privatePayload: 'must-not-reach-the-dom' });
     if (path === `/api/v2/monitors/${encodeURIComponent(id)}`) return reply(state.readStatus === 200 ? monitor : { code: 'notFound' }, state.readStatus);
     if (path === '/api/v2/incidents/incident-1') return reply({ id: 'incident-1', monitorID: id, revision: 'attention-1', state: 'open', acknowledgedBy: 'alice', acknowledgedAt: '2026-09-19T12:00:00Z' });
     const action = { id: 'action-1', monitorID: id, incarnationUID: monitor.metadata.uid, state: 'unknown', kind: 'intervention', held: true, executorFenced: true, reviewRevision: 'review-1' };
@@ -139,4 +140,17 @@ it('rejects an invalid stable route ID without requesting monitor data', async (
   const { requests } = await fixture({ routeID: 'invalid monitor' });
   await screen.findByText('This monitor ID is not valid.');
   expect(requests.some(request => request.path.startsWith('/api/v2/monitors/'))).toBe(false);
+});
+
+
+it('reads file-mode stable-ID observations without requesting a writable catalog resource', async () => {
+  const {requests, writes} = await fixture({observation: true});
+  await screen.findByRole('region', {name: 'Monitor observation'});
+  expect(screen.getByText(/Current health: unknown/)).toBeInTheDocument();
+  expect(screen.getByText(/Last target observation: healthy/)).toBeInTheDocument();
+  expect(await screen.findByText('Checking the checkout deployment')).toBeInTheDocument();
+  expect(screen.queryByRole('button', {name: /snooze|disable|request recovery/i})).not.toBeInTheDocument();
+  expect(document.body.textContent).not.toContain('must-not-reach-the-dom');
+  expect(requests.some(request => request.path.startsWith('/api/v2/monitors/'))).toBe(false);
+  expect(writes).toHaveLength(0);
 });

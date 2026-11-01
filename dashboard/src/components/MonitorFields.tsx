@@ -9,6 +9,7 @@ import { DriverFields, ReferencePicker } from './ResourceForms';
 import { FailureDetails } from './FailureDetails';
 import { MonitorNotificationConditions } from './MonitorNotificationConditions';
 import { useFieldValidation } from './FieldValidation';
+import { RecoveryRules, RecoveryDecisionDetails, RecoveryAdmissionDetails } from './RecoveryRules';
 
 const noop = () => undefined;
 const record = (value: unknown): Record<string, unknown> => object(value) ? value : {};
@@ -82,14 +83,20 @@ export function MonitorFields({ spec: raw, onChange, readOnly = false }: { spec:
         if (!event.target.checked && !window.confirm('Remove recovery configuration from this draft?')) return;
         update('recovery', event.target.checked ? { driver: { type: '', config: {} } } : undefined);
       }} />Configure recovery</label>}
-      {recovery ? <><DriverFields key={`recovery-${record(recovery.driver).type}`} category="recovery" field="spec.recovery.driver" spec={record(recovery.driver)} onChange={driver => updateRecovery('driver', driver)} readOnly={readOnly} />
+      {recovery ? <>
+        {!readOnly && <label className="management-field"><span>Recovery selection</span><select className="input" value={Array.isArray(recovery.rules) ? 'rules' : 'single'} onChange={event => {
+          if (!window.confirm('Replace this draft’s recovery selection settings? Existing saved settings change only after review and apply.')) return;
+          const next = { ...recovery }; delete next.driver; delete next.rules; delete next.taxonomyVersion;
+          update('recovery', event.target.value === 'rules' ? { ...next, taxonomyVersion: '1', rules: [{ id: '', match: { codes: [] }, none: true }] } : { ...next, driver: { type: '', config: {} } });
+        }}><option value="single">Single intervention</option><option value="rules">Error-dependent rules</option></select></label>}
+        {Array.isArray(recovery.rules) ? <RecoveryRules recovery={recovery} checkDriver={String(record(check.driver).type ?? '')} onChange={value => update('recovery', value)} readOnly={readOnly} /> : <DriverFields key={`recovery-${record(recovery.driver).type}`} category="recovery" field="spec.recovery.driver" spec={record(recovery.driver)} onChange={driver => updateRecovery('driver', driver)} readOnly={readOnly} />}
         <div className="grid-2"><ValueField field="spec.recovery.cooldown" label="Recovery cooldown" value={recovery.cooldown} onChange={value => updateRecovery('cooldown', value)} readOnly={readOnly} hint="Go duration, such as 5m." />
           {([['maxAttempts', 'Recovery maximum attempts'], ['retries', 'Recovery retries'], ['maxFailures', 'Recovery maximum failures']] as const).map(([key, label]) => <ValueField key={key} field={`spec.recovery.${key}`} label={label} type="number" value={recovery[key]} hint={key === 'maxAttempts' ? 'Confirmed recovery attempts allowed per incident; defaults to one. An uncertain outcome still blocks conflicting recovery.' : 'This setting cannot authorize repeating an uncertain external effect. Use maximum attempts to bound incident recovery.'} onChange={value => updateRecovery(key, value)} readOnly={readOnly} />)}
         </div><p className="muted">Saving configuration does not immediately invoke recovery. The controller uses incident eligibility and the configured limits.</p></> : <p className="muted">Recovery is not configured.</p>}
     </fieldset>
     <fieldset className="management-field"><legend>Configured notifications</legend>
       <p className="muted">Each notification selects a driver and destinations. Blue reports an uncertain recovery for operator review, and closes after verified health recovery without releasing the action hold.</p>
-      {recovery && (!rules.blue || record(rules.blue).dispatch === false) && <p className="warning">Uncertain recovery has no enabled blue notification destination. Its action will remain held for operator review.</p>}
+      {recovery && (!Array.isArray(recovery.rules) || recovery.rules.some(rule => record(rule).driver)) && (!rules.blue || record(rules.blue).dispatch === false) && <p className="warning">Uncertain recovery has no enabled blue notification destination. Its action will remain held for operator review.</p>}
       {Object.entries(rules).map(([color, rule]) => <CodeFields key={color} color={color} rule={record(rule) as AlertRule} readOnly={readOnly}
         onChange={next => update('notifications', setField(rules, color, next))} />)}
       {!Object.keys(rules).length && <p className="muted">No notifications configured.</p>}
@@ -172,7 +179,22 @@ export function validateMonitorDraft(spec: Record<string, unknown>, capabilities
   };
   const checkError = validateDriver('check', check.driver);
   if (checkError) return checkError;
-  if (spec.recovery) { const failure = validateDriver('recovery', record(spec.recovery).driver); if (failure) return failure; }
+  if (spec.recovery) {
+    const recovery = record(spec.recovery);
+    if (recovery.rules !== undefined) {
+      if (recovery.driver !== undefined || !Array.isArray(recovery.rules) || recovery.rules.length < 1 || recovery.rules.length > 32 || !recovery.taxonomyVersion) return 'Rules require a taxonomy version and 1–32 ordered choices, without a single recovery driver.';
+      const ids = new Set<string>();
+      for (const entry of recovery.rules) {
+        const rule = record(entry), match = record(rule.match);
+        if (typeof rule.id !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(rule.id) || ids.has(rule.id)) return 'Each rule needs a unique stable ID (1–64 letters, digits, underscores or hyphens; beginning with a letter).';
+        ids.add(rule.id);
+        if (!Array.isArray(match.codes) || !match.codes.length || !match.codes.every(code => typeof code === 'string' && code.length <= 64)) return `Rule ${rule.id} needs registered failure codes.`;
+        if (match.httpStatuses !== undefined && (!Array.isArray(match.httpStatuses) || !match.httpStatuses.every(value => Number.isInteger(value) && Number(value) >= 100 && Number(value) <= 599))) return `Rule ${rule.id} needs HTTP statuses from 100 to 599.`;
+        if ((rule.none === true) === (rule.driver !== undefined)) return `Rule ${rule.id} must select one intervention or explicitly select none.`;
+        if (rule.driver) { const failure = validateDriver('recovery', rule.driver); if (failure) return failure; }
+      }
+    } else { const failure = validateDriver('recovery', recovery.driver); if (failure) return failure; }
+  }
   for (const [color, value] of Object.entries(record(spec.notifications))) {
     const rule = record(value);
     if (rule.trigger !== undefined && !['state_change', 'recovery_failed', 'recovery_exhausted'].includes(String(rule.trigger))) return `Notification ${color} has an unsupported notification trigger.`;
@@ -210,10 +232,14 @@ export function MonitorStatusDetails({ monitor }: { monitor: Monitor }) {
     {status?.lastObservedAt && <p>Last target observation: {status.lastObservedHealth || 'unknown'} at {formatDateTime(status.lastObservedAt)}.</p>}
     <p>Maintenance: {status?.maintenance === undefined ? 'Unavailable' : status.maintenance ? 'Active; checks continue' : 'Inactive'} · Ordinary notifications: {status?.notificationsSuppressed === undefined ? 'Suppression unavailable' : status.notificationsSuppressed ? 'Suppressed' : 'Eligible under incident policy'}</p>
     {status?.ignored && <p>Ignored by {status.ignoredBy || 'Unavailable'} since {formatDateTime(status.ignoredAt ?? '')}. {status.ignoreReason} Health observations continue.</p>}
+    <RecoveryDecisionDetails decision={status?.recoveryDecision} />
+    <RecoveryAdmissionDetails admission={status?.recoveryAdmission} />
     <FailureDetails diagnostic={status?.lastFailure} label="Last check failure" />
 	<FailureDetails diagnostic={status?.configurationProblem} label="Check configuration problem" />
 	{status?.configurationProblem && <p>Current health is unknown because local preparation prevents checks. The last target observation is retained separately. Preparation will be retried at the check interval; recovery actions are blocked meanwhile.</p>}
     {status?.warnings?.some(warning => warning.reason === 'unknownRecoveryDestination') && <p className="warning">Uncertain recovery has no enabled blue notification destination. Its action will remain held for operator review.</p>}
+    {status?.warnings?.some(warning => warning.reason === 'recoveryOnlyCoverage') && <p className="warning">The configured red trigger covers recovery outcomes. A no-intervention decision can leave an outage outside its coverage.</p>}
+    {status?.warnings?.filter(warning => warning.reason === 'partialOverlap').map(warning => <p className="warning" key={warning.field}>{warning.field}: this rule partially overlaps an earlier rule; first match wins.</p>)}
     <p>Last-check latency: {latency?.available === true && typeof latency.value === 'number' && Number.isFinite(latency.value) && latency.value >= 0 ? `${latency.value} ms` : 'Unavailable'}</p>
     <p>Control revision: {status?.controlRevision || 'Unavailable'} · Execution revision: {status?.executionRevision || 'Unavailable'}</p>
     <p>Snoozed until: {snoozedUntil === '—' ? 'Not reported' : snoozedUntil} · Current incident: {status?.incidentID || 'Not reported'} · Unknown provider outcomes: {status?.unknownActions ?? 'Unavailable'} · Actions needing review: {status?.actionsNeedingReview ?? 'Unavailable'}</p>

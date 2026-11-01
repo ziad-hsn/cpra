@@ -20,6 +20,9 @@ var (
 )
 
 type ManualRecoveryCommand struct {
+	RuleID                  string                       `json:"rule_id,omitempty"`
+	ExpectedDecision        string                       `json:"expected_decision,omitempty"`
+	ExpectedConfiguration   string                       `json:"expected_configuration,omitempty"`
 	Revision                string                       `json:"revision,omitempty"`
 	MonitorUID              string                       `json:"monitor_uid"`
 	ExpectedControlRevision string                       `json:"expected_control_revision"`
@@ -106,6 +109,9 @@ func validateRecoveryReviewCommand(c Command) error {
 	extra.Kind, extra.MonitorID, extra.At = "", "", time.Time{}
 	if c.Kind == "manual_recovery" {
 		r := c.ManualRecovery
+		if r != nil && (r.RuleID != "" || r.ExpectedDecision != "" || r.ExpectedConfiguration != "") && (!catalogIdentifier(r.RuleID, 64) || !bootstrapHash(r.ExpectedDecision) || !bootstrapHash(r.ExpectedConfiguration)) {
+			return ErrRecoveryRules
+		}
 		if r == nil || !catalogIdentifier(r.MonitorUID, 256) || !catalogIdentifier(r.ExpectedControlRevision, 256) ||
 			!catalogIdentifier(r.OperationID, 256) || (strings.HasPrefix(r.OperationID, "op.") && !validOperationIdentity(r.OperationID, r.Revision)) || (r.Revision != "" && !catalogIdentifier(r.Revision, 256)) || !catalogIdentifier(r.Actor, 128) || !controlText(r.Reason) || strings.TrimSpace(r.Reason) == "" || r.Limits.Validate() != nil ||
 			c.Guard == nil || c.Guard.Removed || c.Guard.validate(c.MonitorID) != nil || c.Guard.monitorUID(c.MonitorID) != r.MonitorUID {
@@ -129,7 +135,7 @@ func validateRecoveryReviewCommand(c Command) error {
 
 func (f *machine) applyRecoveryReview(c Command, index uint64, version int) Result {
 	if c.Kind == "manual_recovery" {
-		return f.applyManualRecovery(c, index)
+		return f.applyManualRecovery(c, index, version)
 	}
 	return f.applyActionReview(c, index, version)
 }
@@ -154,28 +160,86 @@ func (m Monitor) latestRecovery() (Action, bool) {
 	return latest, found
 }
 func (m Monitor) manualRecoveryEligible(at time.Time) bool {
-	if m.Removed || m.Ignored || m.pendingAutomaticIgnore(at) || !m.Policy.Enabled || m.snoozed(at) || m.Policy.InMaintenance(at) || !m.Policy.Intervention || !m.observedUnhealthy() ||
-		m.pendingIntervention() || m.VerifyRemaining > 0 || m.recoveryAttempts() >= m.Policy.recoveryLimit() {
-		return false
+	return m.recoveryEligibility(at) == "eligible"
+}
+
+// recoveryEligibility explains the same state guard used for manual admission.
+// A read of this result grants no authority: identity, control/configuration
+// revisions, operator limits and execution fences are checked at commit/start.
+func (m Monitor) recoveryEligibility(at time.Time) string {
+	if !m.recoveryRuleQualified() {
+		return "rule_not_qualified"
+	}
+	if m.ActionVersion == DispatchFormatVersion || !m.Policy.RecoveryRules.IsZero() {
+		if !m.recoveryBudgetAvailable(at) {
+			return "execution_budget_exhausted"
+		}
+		if m.NotificationMaintenance {
+			return "maintenance"
+		}
+	}
+	switch {
+	case m.Removed:
+		return "monitor_removed"
+	case m.Ignored || m.pendingAutomaticIgnore(at):
+		return "monitor_ignored"
+	case !m.Policy.Enabled:
+		return "monitor_disabled"
+	case m.snoozed(at):
+		return "monitor_snoozed"
+	case m.Policy.InMaintenance(at):
+		return "maintenance"
+	case !m.Policy.Intervention:
+		return "intervention_not_configured"
+	case m.ConfigurationProblem.Code != "":
+		return "monitoring_unavailable"
+	case !m.observedUnhealthy():
+		return "no_unhealthy_observation"
+	case m.pendingIntervention():
+		if m.ActionProjection != nil && m.ActionProjection.RecoveryHeld > 0 {
+			return "intervention_outcome_held"
+		}
+		for _, a := range m.Actions {
+			if m.OwnsAction(a) && a.Kind == "intervention" && a.Held() {
+				return "intervention_outcome_held"
+			}
+		}
+		return "intervention_pending"
+	case m.VerifyRemaining > 0:
+		return "verifying_recovery"
+	case m.recoveryAttempts() >= m.Policy.recoveryLimit():
+		return "attempt_limit"
 	}
 	if m.recoveryAttempts() == 0 {
-		return true
+		return "eligible"
 	}
 	a, ok := m.latestRecovery()
-	return ok && (a.State == Failed || (a.State == Unknown && !a.Held() && a.Review != nil && a.Review.Resolution == "rejected"))
+	if ok && (a.State == Failed || (a.State == Unknown && !a.Held() && a.Review != nil && a.Review.Resolution == "rejected")) {
+		return "eligible"
+	}
+	return "prior_attempt_not_retryable"
 }
-func (f *machine) applyManualRecovery(c Command, index uint64) Result {
+func (f *machine) applyManualRecovery(c Command, index uint64, version int) Result {
 	r := c.ManualRecovery
 	if err := f.checkCatalogGuard(c.MonitorID, c.Guard); err != nil {
 		return Result{Err: err}
 	}
 	previous, ok := f.image.Monitors[c.MonitorID]
+	// Use the new admission semantics without modifying retained action bytes.
+	previous.upgradeDispatch(version)
 	current := f.image.Catalog[(CatalogKey{Kind: "Monitor", ID: c.MonitorID}).indexKey()]
 	if !ok || previous.CatalogUID != r.MonitorUID || current.UID != r.MonitorUID || previous.ControlRevision != r.ExpectedControlRevision || previous.CatalogRevision != current.Revision || previous.DependencyRevision != c.Guard.revision() {
 		return Result{Err: ErrControlConflict}
 	}
 	if !previous.manualRecoveryEligible(c.At) {
 		return Result{Err: ErrRecoveryIneligible}
+	}
+	if previous.Policy.RecoveryRules.IsZero() {
+		if r.RuleID != "" || r.ExpectedDecision != "" || r.ExpectedConfiguration != "" {
+			return Result{Err: ErrRecoveryIneligible}
+		}
+	} else if r.RuleID != previous.RecoveryDecision.RuleID || r.ExpectedDecision != previous.RecoveryDecision.Revision || r.ExpectedConfiguration != previous.Revision {
+		return Result{Err: ErrControlConflict}
 	}
 	if _, exists := f.image.Operations[r.OperationID]; exists {
 		return Result{Err: ErrControlConflict}
@@ -206,16 +270,22 @@ func (f *machine) applyManualRecovery(c Command, index uint64) Result {
 	m.beginIncident(c.At)
 	var actionID string
 	var events []Event
-	m.queueAction("intervention", "", 0, c.At, func(kind string, a *Action) {
+	emit := func(kind string, a *Action) {
 		actionID = a.ID
 		events = append(events, Event{MonitorID: m.ID, CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Revision: a.Revision, At: c.At, Type: kind, ActionID: a.ID, IncidentID: a.IncidentID, Kind: a.Kind, Actor: r.Actor, Reason: r.Reason})
-	})
+	}
+	if m.Policy.RecoveryRules.IsZero() && !dispatchStorageFormat(version) {
+		m.queueAction("intervention", "", 0, c.At, emit)
+	} else {
+		m.queueRecoveryAttempt(c.At, emit)
+	}
 	if actionID == "" {
 		return Result{Err: ErrRecoveryIneligible}
 	}
 	a := m.Actions[actionID]
 	a.Manual, a.OperationID = true, r.OperationID
 	m.Actions[actionID] = a
+	f.image.Version = joinStorageFormat(f.image.Version, version)
 	events = append(events, f.installMonitor(previous, m, c.At)...)
 	receipt := OperationReceipt{Subject: "recovery", ActionID: actionID, ID: r.OperationID, Key: current.Key, UID: m.CatalogUID, OldVersion: r.ExpectedControlRevision, NewVersion: manualRecoveryRevision(r), Generation: current.Generation, CommittedIndex: index, Actor: r.Actor, At: c.At, UpdatedAt: c.At, State: "committed", Outcome: "committed"}
 	f.addActionReceipt(receipt)

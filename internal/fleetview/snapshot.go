@@ -7,6 +7,7 @@
 package fleetview
 
 import (
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"sync"
 	"time"
 )
@@ -16,6 +17,8 @@ import (
 // committed state and never mutates it after publication,
 // so it is safe to read concurrently from HTTP handler goroutines.
 type MonitorSummary struct {
+	RecoveryAdmission                *api.RecoveryAdmission  `json:"recovery_admission,omitempty"`
+	RecoveryDecision                 *api.RecoveryDecision   `json:"recovery_decision,omitempty"`
 	IncarnationUID                   string                  `json:"incarnation_uid"`
 	ConfigurationRevision            string                  `json:"configuration_revision"`
 	CatalogRevision                  string                  `json:"-"`
@@ -42,6 +45,7 @@ type MonitorSummary struct {
 	IncidentID                       string                  `json:"incident_id,omitempty"`
 	PendingNotifications             int                     `json:"pending_notifications"`
 	CompletedNotifications           int                     `json:"completed_notifications"`
+	CancelledNotifications           int                     `json:"cancelled_notifications"`
 	FailedNotifications              int                     `json:"failed_notifications"`
 	UnknownNotifications             int                     `json:"unknown_notifications"`
 	CertificateVerificationDisabled  bool                    `json:"certificate_verification_disabled"`
@@ -101,6 +105,8 @@ type NotificationCondition struct {
 // FailureDiagnostic contains only bounded classified observations, never raw
 // provider responses. Value fields keep published rows immutable.
 type FailureDiagnostic struct {
+	TaxonomyVersion          string    `json:"taxonomy_version,omitempty"`
+	Phase                    string    `json:"phase,omitempty"`
 	Code                     string    `json:"code,omitempty"`
 	Message                  string    `json:"message,omitempty"`
 	HTTPStatus               int       `json:"httpStatus,omitempty"`
@@ -142,9 +148,10 @@ type StatsSnapshot struct {
 // Holder is a thread-safe container for the latest StatsSnapshot. Systems
 // publish via Set; HTTP handlers read via Get.
 type Holder struct {
-	mu    sync.RWMutex
-	snap  *StatsSnapshot
-	index *Index
+	mu       sync.RWMutex
+	snap     *StatsSnapshot
+	index    *Index
+	progress func() bool
 }
 
 // NewHolder returns an empty Holder.
@@ -154,11 +161,66 @@ func NewHolder() *Holder { return &Holder{} }
 // The returned pointer is safe to read concurrently; callers must not mutate it.
 func (h *Holder) Get() *StatsSnapshot {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-	if h.index != nil {
-		return h.index.Overview()
+	index, snap, progress := h.index, h.snap, h.progress
+	h.mu.RUnlock()
+	if index != nil {
+		snap = index.Overview()
 	}
-	return h.snap
+	if snap == nil || progress == nil || progress() {
+		return snap
+	}
+	view := *snap
+	view.ByStatus = map[string]int{"unknown": max(0, view.Total-view.Disabled), "disabled": view.Disabled}
+	view.Unavailable, view.Pending = max(0, view.Total-view.Paused), 0
+	view.SuppressedUnhealthy, view.UnsuppressedUnhealthy = 0, 0
+	return &view
+}
+
+// SetProgress binds an atomic-only process observation. It must never read ECS,
+// open storage or perform I/O. Stale snapshots remain evidence of past checks.
+func (h *Holder) SetProgress(progress func() bool) { h.mu.Lock(); h.progress = progress; h.mu.Unlock() }
+
+// Observation copies one bounded row, preserving its last observed health and
+// incident facts when this process cannot currently continue monitoring.
+func (h *Holder) Observation(row MonitorSummary) MonitorSummary {
+	return WithControllerAvailability(row, h.ControllerAvailability())
+}
+
+// ControllerAvailability captures process progress once for a retained page
+// view. An empty value leaves the monitor's own availability unchanged.
+func (h *Holder) ControllerAvailability() MonitorAvailability {
+	if h == nil {
+		return MonitorAvailability{}
+	}
+	h.mu.RLock()
+	progress := h.progress
+	h.mu.RUnlock()
+	if progress == nil || progress() {
+		return MonitorAvailability{}
+	}
+	return MonitorAvailability{State: "unavailable", Reason: "controllerUnavailable", ObservedAt: time.Now().UTC()}
+}
+
+// WithControllerAvailability preserves the last observation and incident facts.
+// The caller can reuse one captured assessment for a complete retained view.
+func WithControllerAvailability(row MonitorSummary, availability MonitorAvailability) MonitorSummary {
+	if availability.State != "unavailable" {
+		return row
+	}
+	if row.RecoveryAdmission != nil {
+		a := *row.RecoveryAdmission
+		a.Reason, a.ObservedAt = "controller_unavailable", availability.ObservedAt.UTC()
+		row.RecoveryAdmission = &a
+	}
+	row.Health = "unknown"
+	if row.Enabled {
+		row.Status = "unknown"
+	}
+	if row.Availability.State != "paused" {
+		row.Availability = availability
+		row.CheckAdmission = "controller_unavailable"
+	}
+	return row
 }
 
 // Set replaces a static snapshot. Live controllers publish through SetIndex.

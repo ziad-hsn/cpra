@@ -197,6 +197,7 @@ func (f *Frozen) Range(ctx context.Context, visit func(Item) error) error {
 }
 
 type builder struct {
+	jsonInput                bool
 	f                        *Frozen
 	o                        Options
 	seen                     map[string]Location

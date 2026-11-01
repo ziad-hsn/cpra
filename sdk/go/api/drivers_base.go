@@ -80,3 +80,7 @@ func driverTarget(category, kind string) any {
 	return nil
 }
 func validateAdditionalResource(r Resource) error { return errors.New("unsupported resource kind") }
+
+func validateExternalRecoverySettings(DriverConfig, RecoverySpec) error {
+	return InvalidField("rules", "externalFailureProtocol")
+}

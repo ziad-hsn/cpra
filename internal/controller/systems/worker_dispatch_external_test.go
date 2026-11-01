@@ -312,22 +312,138 @@ func queuedExpiredWorkerActions(t *testing.T, s *DurableSystem) persistence.Moni
 	t.Helper()
 	m, _ := s.store.Get("remote")
 	guard := s.managed[m.ID].guard.Clone()
+	at := time.Now().UTC().Add(-time.Minute)
+	// Both notifications and interventions now begin their budget at start.
+	// Give this fixture one confirmed-no-effect recovery retry, then let that
+	// already-started budget expire before the dispatch under test.
+	config := m.Clone()
+	config.Policy.RecoveryMaxAttempts = 2
+	config.Policy.RecoveryCooldown = 0
+	configured, err := s.store.Submit(t.Context(), []persistence.Command{{Kind: "configure", MonitorID: m.ID, Revision: m.Revision, Config: &config, Guard: &guard, At: at}})
+	if err != nil || len(configured) != 1 || configured[0].Err != nil {
+		t.Fatal("configure retry fixture", err)
+	}
 	results, err := s.store.Submit(t.Context(), []persistence.Command{{Kind: "pulse", MonitorID: m.ID,
 		Revision: m.Revision, CheckControlRevision: m.ControlRevision, Generation: 1, Outcome: "failure",
-		At: time.Now().UTC().Add(-time.Minute), Guard: &guard}})
+		At: at, Guard: &guard}})
 	if err != nil || len(results) != 1 || results[0].Err != nil || results[0].Monitor == nil {
 		t.Fatal("queue original actions", err, results)
 	}
 	m = *results[0].Monitor
+	var intervention persistence.Action
+	for _, action := range m.Actions {
+		if action.Kind == "intervention" {
+			intervention = action
+		}
+	}
+	for _, command := range []persistence.Command{
+		{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: intervention.ID, Driver: "external", At: at.Add(time.Second), Guard: &guard},
+		{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: intervention.ID, At: at.Add(2 * time.Second), Outcome: "failure", Retryable: true},
+		{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, CheckControlRevision: m.ControlRevision, Generation: 2, At: at.Add(3 * time.Second), Outcome: "failure", Guard: &guard},
+	} {
+		results, err = s.store.Submit(t.Context(), []persistence.Command{command})
+		if err != nil || len(results) != 1 || results[0].Err != nil || results[0].Monitor == nil || command.Kind == "start" && !results[0].Allowed {
+			t.Fatal("recovery retry fixture", command.Kind, err, results)
+		}
+		m = *results[0].Monitor
+	}
+	var retryIntervention persistence.Action
+	for _, action := range m.Actions {
+		if action.Kind == "intervention" && action.State == persistence.Queued {
+			retryIntervention = action
+		}
+	}
+	if retryIntervention.ID == "" || retryIntervention.ID == intervention.ID || !retryIntervention.Deadline.Equal(at.Add(time.Second+intervention.ExecutionBudget)) {
+		t.Fatal("recovery retry renewed budget")
+	}
+	intervention = retryIntervention
+	// A new notification has no execution deadline while waiting. Seed a
+	// committed start and a confirmed retryable rejection, without invoking a
+	// handler, so this fixture expires the queued retry's original budget.
+	for _, original := range m.Actions {
+		if original.Kind != "code" {
+			continue
+		}
+		commands := []persistence.Command{
+			{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: original.ID, Driver: "external", At: at.Add(time.Second), Guard: &guard, NoticeRevision: persistence.ActionNoticeRevision(original)},
+			{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: original.ID, At: at.Add(2 * time.Second), Outcome: "failure", Retryable: true},
+		}
+		for _, command := range commands {
+			results, err = s.store.Submit(t.Context(), []persistence.Command{command})
+			if err != nil || len(results) != 1 {
+				t.Fatal("notification retry submission", command.Kind, err)
+			}
+			if results[0].Err != nil || command.Kind == "start" && !results[0].Allowed || results[0].Monitor == nil {
+				t.Fatal("notification retry transition", command.Kind, results[0].Err)
+			}
+			m = *results[0].Monitor
+		}
+		found := false
+		for _, retry := range m.Actions {
+			if retry.Kind == "code" && retry.State == persistence.Queued {
+				found = true
+				if retry.ID == original.ID || retry.DeliveryID != original.DeliveryID || retry.Attempt != 2 || retry.ExecutionBudget != original.ExecutionBudget ||
+					!retry.Deadline.Equal(at.Add(time.Second+original.ExecutionBudget)) || !retry.Deadline.Before(time.Now()) {
+					t.Fatal("fixture renewed the original notification budget or identity")
+				}
+			}
+		}
+		if !found {
+			t.Fatal("confirmed rejection did not leave an expired queued retry")
+		}
+	}
+	if len(m.Actions) != 2 || intervention.ID == "" || !reflect.DeepEqual(m.Actions[intervention.ID], intervention) {
+		t.Fatal("expiry fixture changed its original intervention or current action count")
+	}
+	for _, action := range m.Actions {
+		if action.State != persistence.Queued || action.Deadline.IsZero() || !action.Deadline.Before(time.Now()) {
+			t.Fatal("expiry fixture contains work without an expired original deadline")
+		}
+	}
 	s.project(s.entities[m.ID], m)
 	return m
+}
+
+func TestWorkerDispatchPreservesUnstartedNotificationBudget(t *testing.T) {
+	s, _ := workerDispatchOwner(t)
+	m, _ := s.store.Get("remote")
+	guard := s.managed[m.ID].guard.Clone()
+	results, err := s.store.Submit(t.Context(), []persistence.Command{{Kind: "pulse", MonitorID: m.ID,
+		Revision: m.Revision, CheckControlRevision: m.ControlRevision, Generation: 1, Outcome: "failure",
+		At: time.Now().UTC().Add(-time.Minute), Guard: &guard}})
+	if err != nil || len(results) != 1 || results[0].Err != nil || results[0].Monitor == nil {
+		t.Fatal("queue notification", err, results)
+	}
+	m = *results[0].Monitor
+	s.project(s.entities[m.ID], m)
+	var notification persistence.Action
+	for _, action := range m.Actions {
+		if action.Kind == "code" {
+			notification = action
+		}
+	}
+	if notification.ID == "" || notification.ExecutionBudget != 30*time.Second || !notification.Deadline.IsZero() {
+		t.Fatal("queued notification consumed its execution budget")
+	}
+	if !s.dispatchWorkerAction(s.entities[m.ID], notification, notification.Endpoint) {
+		t.Fatal("external notification not recognized")
+	}
+	awaitWorkerPreparation(t, s)
+	page, err := s.store.WorkerExecutions(t.Context(), "", 10)
+	if err != nil || len(page.Items) != 1 {
+		t.Fatal("unstarted notification expired before admission", err)
+	}
+	record := page.Items[0]
+	if record.Intent.ActionID != notification.ID || record.Intent.ExecutionBudget != notification.ExecutionBudget || !record.ExecutionDeadline().IsZero() || record.Lifecycle != nil {
+		t.Fatal("admission started execution or changed its budget")
+	}
 }
 
 func TestWorkerDispatchCommitsExpiredActionsWithoutAssignments(t *testing.T) {
 	s, _ := workerDispatchOwner(t)
 	before := queuedExpiredWorkerActions(t, s)
 	for _, action := range before.Actions {
-		if !s.dispatchWorkerAction(s.entities[before.ID], action) {
+		if !s.dispatchWorkerAction(s.entities[before.ID], action, action.Endpoint) {
 			t.Fatal("worker action not recognized")
 		}
 	}
@@ -405,7 +521,7 @@ func TestWorkerDispatchExpiryReconcilesLostReplies(t *testing.T) {
 					action = a
 				}
 			}
-			if !s.dispatchWorkerAction(s.entities[before.ID], action) {
+			if !s.dispatchWorkerAction(s.entities[before.ID], action, action.Endpoint) {
 				t.Fatal("worker recovery not recognized")
 			}
 			select {

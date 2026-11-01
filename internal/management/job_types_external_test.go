@@ -157,7 +157,7 @@ func TestJobTypeCatalogInvalidContractsHaveNoEffects(t *testing.T) {
 		func(r *api.JobType) { r.Metadata.ID = "http" },
 		func(r *api.JobType) { r.Metadata.ID = "kubernetes" },
 		func(r *api.JobType) { r.Spec.Handler = "../handler" },
-		func(r *api.JobType) { r.Spec.ProtocolVersion = "2" },
+		func(r *api.JobType) { r.Spec.ProtocolVersion = "3" },
 		func(r *api.JobType) { r.Spec.Timeout = "25h" },
 		func(r *api.JobType) { r.Metadata.UID = strings.Repeat("x", 257) },
 		func(r *api.JobType) { r.Metadata.ResourceVersion = strings.Repeat("x", 257) },

@@ -422,3 +422,23 @@ Maintainers publishing from the complete repository checkout must follow the
 module tags, downloaded-consumer checks, and server compatibility gates. That
 guide lives outside this module archive; the installation, client behavior, and
 package documentation above are included in the downloaded module itself.
+
+## Select recovery from a typed failure
+
+`api.RecoverySpec` accepts either the existing `Driver` or an ordered `Rules`
+array with a pinned `TaxonomyVersion`. Each `api.RecoveryRule` has an `ID`, a
+`Match` and either `Driver` or `None: true`. Omission is not an implicit default
+action: no matching rule means no intervention. [Intervention rules](../../docs/intervention-rules.md)
+includes file, management and offline-test examples and explains qualification.
+
+`api.CompileRecoveryRules(checkDriver, recovery)` performs pure static validation
+and returns an immutable matcher plus overlap warnings. `Match` explains one
+observation; it grants no execution permission. Canonical failure codes and
+allowlisted details are also discoverable through server capabilities.
+
+For guarded recovery on a rule-based monitor, use the observed `RuleID`,
+`DecisionRevision`, `ConfigurationRevision` and existing control `Revision` in
+`api.ControlRequest`, with the required reason. `client.Monitors.Recover` never
+updates a stale precondition or retries an ambiguous mutation. Observe the
+operation handle after a lost reply. Single-action monitors retain their
+existing request contract.

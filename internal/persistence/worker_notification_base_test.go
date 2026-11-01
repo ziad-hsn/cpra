@@ -8,7 +8,7 @@ import (
 )
 
 func TestWorkerNotificationDefaultExclusion(t *testing.T) {
-	if supportedFormat(28) || LatestFormatVersion != ActionFormatVersion {
+	if supportedFormat(28) || LatestFormatVersion != DispatchFormatVersion {
 		t.Fatal("default storage admitted notification extensions")
 	}
 	if _, _, err := decodeSnapshot(bytes.NewBufferString("CPRA-COLLECTION-SNAPSHOT-28\n{}"), ""); err == nil {

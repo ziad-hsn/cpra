@@ -25,8 +25,8 @@ MAX_LINE_BYTES = 1024 * 1024
 MAX_TERMINAL_EVENTS = 10000
 TESTS = {
     'github.com/ziad-hsn/cpra': (
-        'TestMainManagementControlsBrowser', 'TestMainManagementRecoveryReviewBrowser',
-        'TestMainReviewNotificationsBrowser',
+        'TestMainManagementControlsBrowser', 'TestMainRecoveryRulesBrowser',
+        'TestMainManagementRecoveryReviewBrowser', 'TestMainReviewNotificationsBrowser',
         'TestMainManagementCollectionBrowser', 'TestMainManagementCollectionExecutionBrowser',
         'TestMainManagementCollectionActivationBrowser', 'TestMainManagementCollectionReselectionBrowser',
         'TestMainManagementCollectionContinuationBrowser',
@@ -34,7 +34,7 @@ TESTS = {
     'github.com/ziad-hsn/cpra/internal/httpserver': ('TestManagementBrowser',),
 }
 SCREENSHOTS = {
-    'dashboard-populated-demo.png', 'review-blue-opening.png', 'review-blue-health-closure.png',
+    'recovery-rules-selected.png', 'recovery-rules-mobile.png', 'dashboard-populated-demo.png', 'review-blue-opening.png', 'review-blue-health-closure.png',
     'review-blue-unknown-closure.png', 'offline-route.png', 'review-blue-mobile.png',
     'monitor-check-unavailable.png', 'monitor-table-desktop.png', 'monitor-table-large-text.png', 'monitor-table-zoom-reflow.png', 'monitor-table-mobile.png',
     'dashboard-overview.png',

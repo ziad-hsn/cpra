@@ -13,16 +13,17 @@ import (
 // Its configuration pin and evaluation time are checked again during Apply.
 // Until is the next possible maintenance start, fencing delayed grant disclosure.
 type WorkerMaintenanceDecision struct {
-	ExecutionID        string    `json:"execution_id"`
-	ExecutionRevision  string    `json:"execution_revision"`
-	MonitorUID         string    `json:"monitor_uid"`
-	MonitorRevision    string    `json:"monitor_revision"`
-	DependencyRevision string    `json:"dependency_revision"`
-	At                 time.Time `json:"at"`
-	Until              time.Time `json:"until,omitzero"`
-	Available          bool      `json:"available"`
-	Active             bool      `json:"active"`
-	SinceQueued        bool      `json:"since_queued"`
+	CurrentMonitorRevision string    `json:"current_monitor_revision,omitempty"`
+	ExecutionID            string    `json:"execution_id"`
+	ExecutionRevision      string    `json:"execution_revision"`
+	MonitorUID             string    `json:"monitor_uid"`
+	MonitorRevision        string    `json:"monitor_revision"`
+	DependencyRevision     string    `json:"dependency_revision"`
+	At                     time.Time `json:"at"`
+	Until                  time.Time `json:"until,omitzero"`
+	Available              bool      `json:"available"`
+	Active                 bool      `json:"active"`
+	SinceQueued            bool      `json:"since_queued"`
 }
 
 // WorkerMaintenanceEvaluator opens only the pinned Monitor configuration. Store
@@ -40,6 +41,9 @@ func (d WorkerMaintenanceDecision) validate(at time.Time) error {
 			return ErrWorkerExecutionInvalid
 		}
 	}
+	if d.CurrentMonitorRevision != "" && !catalogIdentifier(d.CurrentMonitorRevision, 256) {
+		return ErrWorkerExecutionInvalid
+	}
 	if !d.At.Equal(at) || !d.Until.IsZero() && (!d.Until.After(at) || d.Until.Year() > 9999) {
 		return ErrWorkerExecutionInvalid
 	}
@@ -53,7 +57,7 @@ func (d *WorkerMaintenanceDecision) matches(in WorkerExecutionIntent, at time.Ti
 }
 
 func (f *machine) workerMaintenanceAllowed(d *WorkerMaintenanceDecision, in WorkerExecutionIntent, at time.Time) bool {
-	if !d.matches(in, at) {
+	if !f.workerMaintenanceMatches(d, in, at) {
 		return false
 	}
 	m := f.image.Monitors[in.MonitorID]
@@ -62,8 +66,8 @@ func (f *machine) workerMaintenanceAllowed(d *WorkerMaintenanceDecision, in Work
 }
 
 func (f *machine) workerMaintenanceCancellation(d *WorkerMaintenanceDecision, in WorkerExecutionIntent, at time.Time, version int) (*Monitor, []Event) {
-	if !lifecycleStorageFormat(version) || in.Category != "notification" || !d.matches(in, at) ||
-		!d.Active && !d.SinceQueued || f.checkCatalogGuard(in.MonitorID, &in.Guard) != nil {
+	if !lifecycleStorageFormat(version) || in.Category != "notification" || !f.workerMaintenanceMatches(d, in, at) ||
+		!d.Active && !d.SinceQueued || !f.workerExecutionGuardValid(in) {
 		return nil, nil
 	}
 	previous := f.image.Monitors[in.MonitorID]
@@ -71,7 +75,7 @@ func (f *machine) workerMaintenanceCancellation(d *WorkerMaintenanceDecision, in
 	if a.State != Queued || previous.ControlNotification(a) {
 		return nil, nil
 	}
-	r := transitionAtFormat(previous, Command{Kind: "start", MonitorID: in.MonitorID, Revision: in.MonitorRevision,
+	r := transitionAtFormat(previous, Command{Kind: "start", Driver: "external", MonitorID: in.MonitorID, Revision: in.MonitorRevision,
 		ActionID: in.ActionID, At: at, Maintenance: true, NoticeRevision: ActionNoticeRevision(a)}, version)
 	return r.Monitor, r.Events
 }
@@ -120,6 +124,7 @@ func prepareWorkerMaintenance(ctx context.Context, in workerMaintenanceInput, at
 		}
 		// The evaluator owns only the decision, not the identity being authorized.
 		d.Available, d.Active, d.SinceQueued, d.Until = v.Available, v.Active, v.SinceQueued, v.Until
+		d.CurrentMonitorRevision = v.CurrentMonitorRevision
 	} else if !in.policy.PeriodicMaintenance {
 		d.Available = true
 		d.Active = in.policy.InMaintenance(at)
@@ -258,4 +263,16 @@ func (s *Store) prepareWorkerPollMaintenance(ctx context.Context, c WorkerSessio
 	}
 	s.workerMaintenanceMu.Unlock()
 	return out, nil
+}
+
+func (f *machine) workerMaintenanceMatches(d *WorkerMaintenanceDecision, in WorkerExecutionIntent, at time.Time) bool {
+	if !d.matches(in, at) {
+		return false
+	}
+	if d.CurrentMonitorRevision == "" {
+		return true
+	}
+	m := f.image.Monitors[in.MonitorID]
+	record, exists := f.image.Catalog[(CatalogKey{Kind: "Monitor", ID: in.MonitorID}).indexKey()]
+	return exists && !record.Removed && record.UID == in.MonitorUID && record.Revision == d.CurrentMonitorRevision && m.CatalogRevision == record.Revision && m.retainedNotification(m.Actions[in.ActionID]) && f.workerExecutionGuardValid(in)
 }

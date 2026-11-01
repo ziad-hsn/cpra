@@ -231,3 +231,43 @@ func TestPrepareExternalMarkersRequireExplicitSidecar(t *testing.T) {
 		})
 	}
 }
+
+func TestExternalDeliveryBindingExcludesSourceRevisionButPinsDescriptor(t *testing.T) {
+	m, endpoints, groups, bindings := externalTestMonitor(t)
+	first, err := PrepareMonitorExternal(m, endpoints, groups, bindings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+	check, green := first.CheckBinding(), first.NotificationBindings("green")[0]
+	for i := range bindings {
+		if bindings[i].Key.SourceKind == "Monitor" {
+			bindings[i].Key.SourceRevision = "new-monitor-revision"
+		}
+	}
+	m.Pulse.Config.(*manifest.ExternalPulseConfig).Key = bindings[0].Key
+	m.Intervention.Target.(*manifest.ExternalInterventionConfig).Key = bindings[1].Key
+	m.Codes["green"].Config.(*manifest.ExternalNotificationConfig).Key = bindings[4].Key
+	m.Pulse.Interval *= 2
+	second, err := PrepareMonitorExternal(m, endpoints, groups, bindings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close()
+	if first.Revision() == second.Revision() || check != second.CheckBinding() || green != second.NotificationBindings("green")[0] {
+		t.Fatal("unrelated source edit changed delivery dependencies")
+	}
+	descriptor, err := manifest.NewExternalJobDescriptor(bindings[0].Descriptor.Identity(), []byte(`{"value":"changed"}`), bindings[0].Descriptor.CredentialProfile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindings[0].Descriptor = descriptor
+	third, err := PrepareMonitorExternal(m, endpoints, groups, bindings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer third.Close()
+	if third.CheckBinding() == check {
+		t.Fatal("changed external target retained its authorization")
+	}
+}

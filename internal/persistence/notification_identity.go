@@ -198,6 +198,9 @@ func notificationEndpointIdentity(m Monitor, color string, endpoint int) string 
 }
 
 func validateNotificationAction(a Action, version, notificationVersion int) error {
+	if err := validateActionRule(a, version); err != nil {
+		return err
+	}
 	if err := validateNotificationBudget(a, version); err != nil {
 		return err
 	}
@@ -217,7 +220,7 @@ func validateNotificationAction(a Action, version, notificationVersion int) erro
 	if a.Kind == "intervention" && lifecycleStorageFormat(version) {
 		if a.DeliveryID != "" || a.NotificationEpisode != "" || a.EndpointID != "" || a.NotificationCorrelation != "" ||
 			a.QueuedAt.IsZero() || a.QueuedAt.After(a.NotBefore) || a.QueuedAt.Year() < 1 || a.QueuedAt.Year() > 9999 ||
-			!a.Deadline.After(a.NotBefore) || a.Deadline.Sub(a.NotBefore) > 24*time.Hour || a.Deadline.Year() > 9999 {
+			!validInterventionTiming(a, version) {
 			return ErrNotificationIdentity
 		}
 		return nil
@@ -229,4 +232,17 @@ func validateNotificationAction(a Action, version, notificationVersion int) erro
 		return ErrNotificationIdentity
 	}
 	return nil
+}
+
+// Format50 grants a captured budget at first start. Older absolute deadlines
+// retain their original queue-time validation. A retry can only shorten the
+// remaining budget, never renew it from its later StartedAt.
+func validInterventionTiming(a Action, version int) bool {
+	if dispatchStorageFormat(version) && a.ExecutionBudget > 0 {
+		if a.Deadline.IsZero() {
+			return a.StartedAt.IsZero() && (a.State == Queued || a.State == Cancelled)
+		}
+		return a.Deadline.Year() <= 9999 && a.Deadline.Year() >= 1 && (a.StartedAt.IsZero() || a.Deadline.After(a.StartedAt) && !a.Deadline.After(a.StartedAt.Add(a.ExecutionBudget)))
+	}
+	return a.Deadline.After(a.NotBefore) && a.Deadline.Sub(a.NotBefore) <= 24*time.Hour && a.Deadline.Year() <= 9999
 }

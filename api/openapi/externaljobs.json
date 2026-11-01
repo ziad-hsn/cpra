@@ -56,6 +56,16 @@
             "type": "string"
           },
           "x-go-type-skip-optional-pointer": true
+        },
+        "failureCodes": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^custom\\.[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "x-go-type-skip-optional-pointer": true
         }
       },
       "required": [
@@ -124,6 +134,16 @@
         },
         "kind": {
           "type": "string"
+        },
+        "protocolVersion": {
+          "type": "string",
+          "enum": [
+            "1",
+            "2"
+          ],
+          "x-go-type-skip-optional-pointer": true,
+          "x-go-type": "string",
+          "description": "Omitted means protocol 1. Protocol 2 explicitly supports structured check failures."
         }
       },
       "required": [
@@ -271,6 +291,25 @@
         },
         "notification": {
           "$ref": "#/components/schemas/WorkerNotification"
+        },
+        "protocolVersion": {
+          "type": "string",
+          "enum": [
+            "1",
+            "2"
+          ],
+          "x-go-type-skip-optional-pointer": true,
+          "x-go-type": "string",
+          "description": "Omitted means protocol 1. Protocol 2 explicitly supports structured check failures."
+        },
+        "failureCodes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "maxItems": 32,
+          "x-go-type-skip-optional-pointer": true
         }
       },
       "required": [
@@ -584,6 +623,9 @@
           "minLength": 1,
           "maxLength": 256,
           "x-go-name": "WorkerUID"
+        },
+        "failure": {
+          "$ref": "#/components/schemas/WorkerFailure"
         }
       },
       "required": [
@@ -862,6 +904,43 @@
         "at"
       ],
       "additionalProperties": false
+    },
+    "WorkerFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "phase": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "httpStatus": {
+          "type": "integer",
+          "x-go-name": "HTTPStatus"
+        },
+        "grpcCode": {
+          "type": "string",
+          "x-go-name": "GRPCCode"
+        },
+        "grpcStatus": {
+          "type": "string",
+          "x-go-name": "GRPCStatus"
+        },
+        "certificateNotAfter": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "certificateDaysRemaining": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "code",
+        "phase"
+      ]
     }
   },
   "paths": {
@@ -901,7 +980,7 @@
             }
           }
         },
-        "description": "Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization."
+        "description": "Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization."
       }
     },
     "/api/v2/external-workers/start": {
@@ -950,7 +1029,7 @@
             }
           }
         },
-        "description": "Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization."
+        "description": "Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization."
       }
     },
     "/api/v2/external-workers/heartbeat": {
@@ -989,7 +1068,7 @@
             }
           }
         },
-        "description": "Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization."
+        "description": "Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization."
       }
     },
     "/api/v2/external-workers/result": {
@@ -1038,7 +1117,7 @@
             }
           }
         },
-        "description": "Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization."
+        "description": "Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization."
       }
     },
     "/api/v2/external-workers/late-evidence": {
@@ -1077,7 +1156,7 @@
             }
           }
         },
-        "description": "Worker protocol 1. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization."
+        "description": "Worker protocols 1 and 2. Structured check reports require explicit protocol-2 capability and the original immutable JobType vocabulary. Requires an externaljobs server build, explicit runtime enablement and scoped worker authorization."
       }
     },
     "/api/v2/job-types": {

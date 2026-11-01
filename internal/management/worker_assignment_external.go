@@ -117,7 +117,7 @@ func (c *Catalog) PrepareWorkerExecution(ctx context.Context, intent persistence
 			return fail(workerPreparationError(ctx, err))
 		}
 		action, exists := monitor.Actions[intent.ActionID]
-		if !ok || monitor.Removed || monitor.CatalogUID != intent.MonitorUID || monitor.Revision != intent.MonitorRevision || monitorSource && monitor.CatalogRevision != intent.SourceRevision ||
+		if !ok || monitor.Removed || monitor.CatalogUID != intent.MonitorUID || !monitor.ActionConfigurationCurrent(action) || monitorSource && monitor.CatalogRevision != intent.SourceRevision ||
 			!exists || action.Kind != "code" || action.State != persistence.Queued || action.CatalogUID != intent.MonitorUID || action.Revision != intent.MonitorRevision || !action.NotBefore.Equal(intent.Scheduled) {
 			return fail(persistence.ErrWorkerExecutionConflict)
 		}

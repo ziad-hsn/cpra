@@ -10,9 +10,9 @@ import { sourceCoordinates, type SourceCoordinates } from './validation';
  * streaming and persistent/cross-tab resume are not provided here.
  */
 export const collectionIdentityFormat = 'cpra.collection.hmac-sha256-json-bytes.v1' as const;
-export const fileNormalizationProfile = 'cpra.file.base.v3' as const;
-export type FileNormalizationProfile = typeof fileNormalizationProfile | 'cpra.file.base.v1';
-export const supportedFileNormalizationProfile = (value: unknown): value is FileNormalizationProfile => value === fileNormalizationProfile || value === 'cpra.file.base.v1';
+export const fileNormalizationProfile = 'cpra.file.base.v5' as const;
+export type FileNormalizationProfile = typeof fileNormalizationProfile | 'cpra.file.base.v1' | 'cpra.file.base.v2' | 'cpra.file.base.v3' | 'cpra.file.base.v4';
+export const supportedFileNormalizationProfile = (value: unknown): value is FileNormalizationProfile => value === fileNormalizationProfile || value === 'cpra.file.base.v1' || value === 'cpra.file.base.v2' || value === 'cpra.file.base.v3' || value === 'cpra.file.base.v4';
 export const browserCollectionLimits = Object.freeze({ sourceBytes: 4 << 20, requestBytes: 4 << 20, resourceBytes: 1 << 20, items: 10_000, sources: 10_000 });
 
 export interface CollectionInventoryPosition {
@@ -233,20 +233,23 @@ export interface WorkerCollectionSummary {
   readonly preflightAvailable: boolean;
   readonly warningCount?: number;
 }
-export interface CollectionWarning { readonly field: 'spec.notifications.blue'; readonly reason: 'unknownRecoveryDestination' }
+export type CollectionWarning = { readonly field: 'spec.notifications.blue'; readonly reason: 'unknownRecoveryDestination' } | { readonly field: 'spec.notifications.red.trigger'; readonly reason: 'recoveryOnlyCoverage' } | { readonly field: string; readonly reason: 'partialOverlap' };
 export interface WorkerCollectionItemSummary extends CollectionInventoryPosition { readonly bytes: number; readonly coordinates?: SourceCoordinates; readonly warnings?: readonly CollectionWarning[] }
 type WorkerItem = { position: CollectionInventoryPosition; raw: Uint8Array; digest?: Uint8Array; coordinates?: SourceCoordinates; warnings: readonly CollectionWarning[] };
 // The shared Go validator chooses advisories. Only reviewed metadata leaves the
 // worker; arbitrary messages and resource values never enter preview state.
 function collectionWarnings(value: unknown): readonly CollectionWarning[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 8) throw invalid();
-  let present = false;
+  // At most 31 later rules can overlap, plus the two notification advisories.
+  if (!Array.isArray(value) || value.length > 33) throw invalid();
+  const warnings: CollectionWarning[] = [];
+  const seen = new Set<string>();
   for (const item of value) {
-    if (!item || typeof item !== 'object' || Array.isArray(item) || item.field !== 'spec.notifications.blue' || item.reason !== 'unknownRecoveryDestination') throw invalid();
-    present = true;
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw invalid();
+    if (!(item.field === 'spec.notifications.blue' && item.reason === 'unknownRecoveryDestination') && !(item.field === 'spec.notifications.red.trigger' && item.reason === 'recoveryOnlyCoverage') && !(typeof item.field === 'string' && /^spec\.recovery\.rules\[(?:[0-9]|[12][0-9]|3[01])\]$/.test(item.field) && item.reason === 'partialOverlap')) throw invalid();
+    if (!seen.has(item.field)) { seen.add(item.field); warnings.push({ field: item.field, reason: item.reason }); }
   }
-  return present ? [{ field: 'spec.notifications.blue', reason: 'unknownRecoveryDestination' }] : [];
+  return warnings;
 }
 const workerLimit = () => new Error('Collection preparation exceeds the configured browser import quota.');
 const concatenate = (parts: readonly Uint8Array[], maximum: number): Uint8Array<ArrayBuffer> => {

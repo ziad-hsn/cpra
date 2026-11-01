@@ -19,14 +19,14 @@ import (
 func TestStoppedBackupRecordsCommittedStateFormat(t *testing.T) {
 	// The fixture commits only built-in state, even when the binary can also
 	// read external-worker formats. Capability alone must not upgrade a store.
-	testStoppedBackupStateFormat(t, persistence.NotificationConditionFormatVersion, nil)
+	testStoppedBackupStateFormat(t, persistence.DispatchFormatVersion, nil)
 }
 
 func testStoppedBackupStateFormat(t *testing.T, wantFormat int, commitOptional func(*testing.T, *persistence.Store)) {
 	t.Helper()
 	for _, phase := range []string{"log-only", "snapshot", "snapshot-and-newer-log"} {
 		t.Run(phase, func(t *testing.T) {
-			root := t.TempDir()
+			root := backupCollectionRoot(t)
 			key := backupTestKey(t, root)
 			cfg := runtimeconfig.Default()
 			cfg.Storage.Directory = filepath.Join(root, "state")

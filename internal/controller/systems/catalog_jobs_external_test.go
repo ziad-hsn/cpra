@@ -270,6 +270,9 @@ func TestCatalogExternalOwnerLoadsAndRestoresSourcePins(t *testing.T) {
 		"yellow": {{}, {Kind: "NotificationEndpoint", ID: "remote-endpoint", UID: remote.Metadata.UID, Revision: remote.Metadata.ResourceVersion}},
 		"green":  {{Kind: "Monitor", ID: "remote", UID: monitor.Metadata.UID, Revision: monitor.Metadata.ResourceVersion}},
 	}
+	wantDrivers := map[string][]string{
+		"red": {"external", "webhook"}, "yellow": {"webhook", "external"}, "green": {"external"},
+	}
 	load := func(catalog *management.Catalog) *DurableSystem {
 		w := ecs.NewWorld()
 		s := NewDurableSystem(&w, store, cfg, &fleetview.Holder{}, noopLogger{}, &admissionQueue{full: true}, nil, nil, nil, time.Minute, false)
@@ -281,6 +284,9 @@ func TestCatalogExternalOwnerLoadsAndRestoresSourcePins(t *testing.T) {
 		if !ok || !reflect.DeepEqual(m.Policy.WorkerNotificationSources, wantSources) || !reflect.DeepEqual(m.Policy.Endpoints, map[string]int{"red": 2, "yellow": 2, "green": 1}) {
 			t.Fatal("committed policy changed notification positions or source identities")
 		}
+		if !reflect.DeepEqual(m.Policy.NotificationDrivers, wantDrivers) {
+			t.Fatal("committed policy lost notification driver positions", m.Policy.NotificationDrivers)
+		}
 		raw, err := json.Marshal(m)
 		if err != nil || bytes.Contains(raw, []byte("private-parameter-canary")) || bytes.Contains(raw, []byte("local-profile-canary")) {
 			t.Fatal("worker parameters entered the monitor's durable metadata")
@@ -289,6 +295,14 @@ func TestCatalogExternalOwnerLoadsAndRestoresSourcePins(t *testing.T) {
 		jobs := s.jobs.Get(ent)
 		if jobs.PulseJob != nil || jobs.InterventionJob != nil || jobs.ExternalJobs == nil || jobs.ExternalJobs.Check == nil || jobs.ExternalJobs.Recovery == nil || jobs.CodeJobs["red"][0] != nil || jobs.CodeJobs["red"][1] == nil || jobs.CodeJobs["yellow"][0] == nil || jobs.CodeJobs["yellow"][1] != nil || s.PulseArrivalRate() != 0 {
 			t.Fatal("owner lost external bindings or routed them to local workers")
+		}
+		for color, drivers := range wantDrivers {
+			for index, driver := range drivers {
+				flow := jobs.CodeFlows[color][index]
+				if flow.Driver != driver || driver == "external" && (flow.Key != 0 || jobs.CodeJobs[color][index] != nil) {
+					t.Fatal("external notification gained a local queue or lost its driver", color, index)
+				}
+			}
 		}
 		return s
 	}

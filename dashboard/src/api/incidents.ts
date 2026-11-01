@@ -40,13 +40,15 @@ function incident(value: unknown): Incident {
 }
 
 /** The server freezes the latest incident per monitor; older events are in history. */
-export async function listIncidents(session: DashboardSession, cursor = '', monitorID = '', signal?: AbortSignal): Promise<IncidentList> {
+export type IncidentFilters = { state?: '' | 'open' | 'pending' | 'closed'; acknowledged?: '' | 'true' | 'false'; dismissed?: '' | 'true' | 'false'; order?: 'triage' | 'id' };
+export async function listIncidents(session: DashboardSession, cursor = '', monitorID = '', signal?: AbortSignal, filters: IncidentFilters = {}): Promise<IncidentList> {
   if (cursor.length > 8192 || (monitorID !== '' && !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(monitorID))) {
     throw new ManagementError('invalid', 'Use an exact monitor ID and the original incident cursor.');
   }
   const query = new URLSearchParams({ limit: '100' });
   if (cursor) query.set('cursor', cursor);
   if (monitorID) query.set('monitorID', monitorID);
+  for (const key of ['state', 'acknowledged', 'dismissed', 'order'] as const) if (filters[key]) query.set(key, filters[key]);
   const value = (await session.get<unknown>(`/api/v2/incidents?${query}`, { signal })).data;
   if (!object(value) || !Array.isArray(value.items) || value.items.length > 100) throw invalid();
   const items = value.items.map(incident);

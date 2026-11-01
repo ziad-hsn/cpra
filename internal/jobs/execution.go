@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -104,6 +105,9 @@ func operationContext(parent context.Context, timeout time.Duration) (context.Co
 // Dispatch identifies one accepted operation, independently of the reusable
 // monitor template. Its result is correlated even when a transport panics.
 type Dispatch struct {
+	cancelled                                       *atomic.Bool
+	RateScopes                                      []NotificationRateScope
+	FenceResult                                     bool
 	ProviderKey                                     string
 	ResolutionNotification                          *ResolutionNotification
 	ReviewNotification                              *ReviewNotification
@@ -164,21 +168,34 @@ func NotificationConfigBudget(config manifest.CodeNotification) time.Duration {
 }
 
 func NewDispatch(job Job, ent ecs.Entity, kind, color string, generation uint64, endpoint int) *Dispatch {
-	d := &Dispatch{ProviderCorrelationVersion: 1, Job: job.Copy(), Ent: ent, Kind: kind, Color: color, Generation: generation, Endpoint: endpoint, ID: uuid.New()}
+	d := &Dispatch{cancelled: &atomic.Bool{}, ProviderCorrelationVersion: 1, Job: job.Copy(), Ent: ent, Kind: kind, Color: color, Generation: generation, Endpoint: endpoint, ID: uuid.New()}
 	if agentJob(d.Job) != nil {
 		d.Driver = "a2a"
 	}
 	return d
 }
+
+// CancelBeforeStart only cancels an operational queue entry. The committed
+// action and any already-authorized invocation retain their original evidence.
+func (d *Dispatch) CancelBeforeStart() {
+	if d.cancelled != nil {
+		d.cancelled.Store(true)
+	}
+}
+func (d *Dispatch) CancelledBeforeStart() bool     { return d.cancelled != nil && d.cancelled.Load() }
 func (d *Dispatch) SetContext(ctx context.Context) { d.parent = ctx }
 func (d *Dispatch) Execute() (r Result) {
 	var started time.Time
 	var finished func() error
+	recorder := d.rateRecorder()
 	defer func() {
 		if recover() != nil {
 			r.Err = ErrJobPanic
 		}
 		ended := time.Now()
+		if !started.IsZero() || finished != nil {
+			r.RateFeedback = recorder.feedback(ended)
+		}
 		if finished != nil {
 			r.FinalizationErr = finalizeInvocation(finished)
 		}
@@ -193,6 +210,9 @@ func (d *Dispatch) Execute() (r Result) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if recorder != nil {
+		ctx = context.WithValue(ctx, notificationRateKey{}, recorder)
+	}
 	if !d.Deadline.IsZero() {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithDeadline(ctx, d.Deadline)
@@ -200,6 +220,9 @@ func (d *Dispatch) Execute() (r Result) {
 	}
 	if err := ctx.Err(); err != nil {
 		return Result{Err: err}
+	}
+	if d.CancelledBeforeStart() {
+		return Result{Err: context.Canceled}
 	}
 	agent := agentJob(d.Job)
 	isAgent := agent != nil

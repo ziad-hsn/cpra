@@ -113,6 +113,11 @@ func (d *Dispatch) agentAction() agentAction {
 	}
 	action := agentAction{SchemaVersion: "1", MonitorID: d.MonitorID, MonitorUID: d.CatalogUID,
 		Revision: d.Revision, IncidentID: d.IncidentID, ActionID: d.ActionID, Role: role, Color: d.Color, Attempt: d.Attempt, RecoveryFailure: d.RecoveryFailure}
+	if d.RecoveryFailure != nil {
+		failure := *d.RecoveryFailure
+		failure.FailedAt = failure.FailedAt.UTC()
+		action.RecoveryFailure = &failure
+	}
 	if d.Kind == "code" && d.FailureCode != "" {
 		action.Failure = &agentFailure{Code: d.FailureCode, Message: d.FailureMessage}
 	}
@@ -166,7 +171,9 @@ func (j *A2AJob) validAction(action agentAction) bool {
 	}
 	if f := action.RecoveryFailure; f != nil {
 		if action.Role != "notification" || action.Color != "red" || action.IncidentID == "" || !validA2AIdentity(f.ActionID) || f.ActionID == action.ActionID || !validA2AIdentity(f.Driver) || len(f.Driver) > 128 || f.Attempt < 1 || f.Attempt > math.MaxInt32 || f.MaxAttempts < 1 || f.MaxAttempts > math.MaxInt32 || f.FailedAt.IsZero() || f.Outcome != "failure" ||
-			(f.Trigger != "recovery_failed" && f.Trigger != "recovery_exhausted") || (f.Trigger == "recovery_exhausted" && f.Attempt < f.MaxAttempts) {
+			(f.Trigger != "recovery_failed" && f.Trigger != "recovery_exhausted") ||
+			(f.Trigger == "recovery_exhausted" && f.Attempt < f.MaxAttempts && f.TerminationReason != "permanent_rejection" && f.TerminationReason != "execution_deadline") ||
+			(f.TerminationReason != "" && f.TerminationReason != "attempt_limit" && f.TerminationReason != "execution_deadline" && f.TerminationReason != "permanent_rejection") {
 			return false
 		}
 	}

@@ -339,6 +339,38 @@ func TestJobTypeRetainedVersionQuotaIsNotEviction(t *testing.T) {
 	}
 }
 
+func TestJobTypeStructuredFailureSnapshotFormats(t *testing.T) {
+	s := openCatalogMemory(t)
+	create := jobTypeFixture(t, s, "structured-probe")
+	create.Value.ProtocolVersion = "2"
+	create.Value.FailureCodes = []string{"custom.cache.full"}
+	commitJobType(t, s, create)
+	snapshot, err := s.fsm.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer snapshot.Release()
+	sink := &collectionTestSink{}
+	if err := snapshot.Persist(sink); err != nil {
+		t.Fatal(err)
+	}
+	frozen, ledger, err := decodeSnapshot(bytes.NewReader(sink.Bytes()), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ledger.Close()
+	for _, format := range []int{WorkerNotificationConditionFormatVersion, RecoveryRulesFormatVersion, WorkerRecoveryRulesFormatVersion, DispatchFormatVersion, WorkerDispatchFormatVersion, WorkerDispatchFormatVersion + 2} {
+		t.Run(fmt.Sprint(format), func(t *testing.T) {
+			candidate := frozen
+			candidate.Version = format
+			wantValid := format == WorkerRecoveryRulesFormatVersion || format == WorkerDispatchFormatVersion
+			if err := validateImageExtensions(candidate); (err == nil) != wantValid {
+				t.Fatalf("structured failure contract at format %d: %v", format, err)
+			}
+		})
+	}
+}
+
 func TestJobTypeNativeSnapshotAndLogReplay(t *testing.T) {
 	config := testConfig(t)
 	s, err := Open(t.Context(), config)

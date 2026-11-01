@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"slices"
 	"time"
+
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
 // FailureDiagnostic contains only reviewed descriptions. Provider response
 // bodies, addresses, paths and error strings are never diagnostic inputs.
 type FailureDiagnostic struct {
+	TaxonomyVersion          string    `json:"taxonomy_version,omitempty"`
+	Phase                    string    `json:"phase,omitempty"`
 	Code                     string    `json:"code"`
 	Message                  string    `json:"message"`
 	HTTPStatus               int       `json:"http_status,omitempty"`
@@ -20,6 +24,8 @@ type FailureDiagnostic struct {
 }
 
 var ErrFailureDiagnostic = errors.New("invalid failure diagnostic")
+
+func (d FailureDiagnostic) MonitoringUnavailable() bool { return d.configurationProblem() }
 
 // NewFailureDiagnostic returns the canonical safe message for a cause code.
 // An unknown code has no diagnostic; callers cannot supply an arbitrary message.
@@ -67,7 +73,54 @@ func NewFailureDiagnostic(code string) FailureDiagnostic {
 }
 
 func (d FailureDiagnostic) configurationProblem() bool {
+	if d.TaxonomyVersion != "" {
+		if (d.Code == "grpc_health_failed" || d.Code == "grpc.rpc_failed") && d.GRPCCode == "Canceled" {
+			return true
+		}
+		definition, ok := api.FailureCodeDefinition(d.TaxonomyVersion, d.Code)
+		return ok && !definition.Available
+	}
 	return d.Code == "ca_file_missing" || d.Code == "ca_file_unreadable" || d.Code == "ca_file_invalid"
+}
+
+// CheckFailure copies an allowlisted observation into durable value fields.
+// Validation still runs at the authoritative command boundary.
+func CheckFailure(f api.FailureDiagnostic) FailureDiagnostic {
+	d := FailureDiagnostic{TaxonomyVersion: f.TaxonomyVersion, Phase: f.Phase, Code: f.Code, Message: f.Message}
+	if f.HTTPStatus != nil {
+		d.HTTPStatus = *f.HTTPStatus
+	}
+	if f.GRPCCode != nil {
+		d.GRPCCode = *f.GRPCCode
+	}
+	if f.GRPCStatus != nil {
+		d.GRPCStatus = string(*f.GRPCStatus)
+	}
+	if f.CertificateNotAfter != nil {
+		d.CertificateNotAfter = f.CertificateNotAfter.UTC()
+	}
+	if f.CertificateDaysRemaining != nil {
+		d.CertificateDaysRemaining = *f.CertificateDaysRemaining
+	}
+	return d
+}
+
+func (d FailureDiagnostic) Public() api.FailureDiagnostic {
+	f := api.FailureDiagnostic{TaxonomyVersion: d.TaxonomyVersion, Phase: d.Phase, Code: d.Code, Message: d.Message}
+	if d.HTTPStatus != 0 {
+		f.HTTPStatus = &d.HTTPStatus
+	}
+	if d.GRPCCode != "" {
+		f.GRPCCode = &d.GRPCCode
+	}
+	if d.GRPCStatus != "" {
+		v := api.FailureDiagnosticGrpcStatus(d.GRPCStatus)
+		f.GRPCStatus = &v
+	}
+	if !d.CertificateNotAfter.IsZero() {
+		f.CertificateNotAfter, f.CertificateDaysRemaining = &d.CertificateNotAfter, &d.CertificateDaysRemaining
+	}
+	return f
 }
 
 func (d FailureDiagnostic) requiresConditionFormat() bool {
@@ -99,6 +152,16 @@ func (d FailureDiagnostic) requiresLifecycleFormat() bool {
 
 func (d FailureDiagnostic) validate(version int) error {
 	if d == (FailureDiagnostic{}) {
+		return nil
+	}
+	if d.TaxonomyVersion != "" || d.Phase != "" {
+		if validCustomFailure(d, version) {
+			return nil
+		}
+		definition, ok := api.FailureCodeDefinition(d.TaxonomyVersion, d.Code)
+		if !recoveryRulesStorageFormat(version) || !ok || len(definition.Drivers) == 0 || d.Message != definition.Message || api.ValidateFailureObservation(definition.Drivers[0], d.Public()) != nil {
+			return ErrFailureDiagnostic
+		}
 		return nil
 	}
 	if !deliveryStorageFormat(version) || d.Code == "" || NewFailureDiagnostic(d.Code).Code == "" {

@@ -220,6 +220,11 @@ func (f *machine) workerFinalizationTransition(r WorkerExecutionRecord, at time.
 			return nil, nil
 		}
 		a.State, a.Outcome = Cancelled, "worker_not_started"
+		if dispatchStorageFormat(previous.ActionVersion) && r.Finalization != nil && r.Finalization.Reason == "deadline" && !a.Deadline.IsZero() && !at.Before(a.Deadline) {
+			// A recorded action budget expired. An unstarted first offer with
+			// only a conservative assignment bound has no execution deadline.
+			a.TerminationReason = "execution_deadline"
+		}
 		if actionStorageFormat(previous.ActionVersion) && a.Kind == "code" {
 			if !a.Deadline.IsZero() && !at.Before(a.Deadline) {
 				a.Outcome = "notification_deadline"

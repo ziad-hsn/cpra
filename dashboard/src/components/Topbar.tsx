@@ -50,19 +50,22 @@ export function Topbar() {
   const stale = Boolean(overview && (dataUpdatedAt && now - dataUpdatedAt > 30000 || Number.isFinite(projectedAt) && now - projectedAt > 30000));
   const unavailable = offline || isError || stale || projectionUncertain;
   const ok = !isLoading && !unavailable && active > 0 && paused === 0 && unavailableChecks === 0 && suppressed === 0 && critical === 0 && degraded === 0 && unknown === 0 && verifying === 0;
+  const conditions = [
+    critical > 0 ? `${critical} monitor${critical !== 1 ? 's' : ''} critical — investigate` : '',
+    unavailableChecks > 0 ? `${unavailableChecks} monitor${unavailableChecks !== 1 ? 's' : ''} unavailable — review check configuration` : '',
+    suppressed > 0 ? `${suppressed} unhealthy monitor${suppressed !== 1 ? 's' : ''} — notifications suppressed` : '',
+    degraded > 0 ? `${degraded} monitor${degraded !== 1 ? 's' : ''} degraded — review warnings` : '',
+    unknown > 0 ? `Awaiting first check results: ${unknown}` : '',
+    verifying > 0 ? `${verifying} monitor${verifying !== 1 ? 's' : ''} verifying` : '',
+    paused > 0 ? `${paused} monitor${paused !== 1 ? 's' : ''} paused` : '',
+  ].filter(Boolean);
   const statusText = offline ? 'Offline — current health unavailable'
     : stale ? 'Observations are stale — current health unavailable'
     : projectionUncertain ? 'Projection freshness unavailable — current health unavailable'
     : isError ? 'Status unavailable'
     : isLoading ? 'Loading fleet status…'
-    : active === 0 ? (paused > 0 ? `${paused} monitor${paused !== 1 ? 's' : ''} paused` : 'No active monitors')
-    : critical > 0 ? `${critical} monitor${critical !== 1 ? 's' : ''} critical — investigate`
-    : unavailableChecks > 0 ? `${unavailableChecks} monitor${unavailableChecks !== 1 ? 's' : ''} unavailable — review check configuration`
-    : suppressed > 0 ? `${suppressed} unhealthy monitor${suppressed !== 1 ? 's' : ''} — notifications suppressed`
-    : degraded > 0 ? `${degraded} monitor${degraded !== 1 ? 's' : ''} degraded — review warnings`
-    : unknown > 0 ? 'Awaiting first check results'
-    : verifying > 0 ? `${verifying} monitor${verifying !== 1 ? 's' : ''} verifying`
-    : paused > 0 ? `${active} active; ${paused} paused`
+    : conditions.length ? conditions.join('; ')
+    : active === 0 ? 'No active monitors'
     : 'All systems operational';
 
   return (

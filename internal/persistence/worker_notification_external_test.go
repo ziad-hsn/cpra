@@ -84,7 +84,7 @@ func TestWorkerNotificationSourceAdmissionAndFormat(t *testing.T) {
 	for version := WorkerExecutionFormatVersion; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion || version == WorkerNotificationConditionFormatVersion || version == WorkerRecoveryRulesFormatVersion || version == WorkerDispatchFormatVersion) {
 			t.Fatal("inline command format", version, err)
 		}
 	}
@@ -159,7 +159,7 @@ func TestWorkerNotificationPolicyKindsAndEndpointEncoding(t *testing.T) {
 	in, _ := inlineNotificationFixture(t, s)
 	m, _ := s.Get(in.MonitorID)
 	command := Command{Kind: "configure", Config: &m}
-	if commandWriteFormat(command) != ActionWorkerFormatVersion {
+	if commandWriteFormat(command) != WorkerDispatchFormatVersion {
 		t.Fatal("configuration failed to stamp inline source format")
 	}
 	for _, kind := range []string{"Credential", "JobType", "monitor", "*"} {

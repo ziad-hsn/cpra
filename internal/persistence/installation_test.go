@@ -64,6 +64,14 @@ func TestInstallationUpgradePreservesExposureAndActionIdentity(t *testing.T) {
 		if after.InstallationID == "" || after.NotificationCorrelation != before.NotificationCorrelation || after.NotificationAttempted != before.NotificationAttempted || !reflect.DeepEqual(after.Actions, before.Actions) {
 			t.Fatal("namespace migration rewrote existing effect evidence")
 		}
+		// Namespace assignment is only one startup phase. Current notifications
+		// require the same committed exposure conversion performed by Open.
+		if err := s.migrateActionProjection(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.migrateNotificationConditions(t.Context()); err != nil {
+			t.Fatal(err)
+		}
 		for n := 2; n <= 3; n++ {
 			submit(t, s, Command{Kind: "pulse", MonitorID: m.ID, Revision: m.Revision, Generation: uint64(n), At: at.Add(time.Duration(n) * time.Second), Outcome: "success"})
 		}

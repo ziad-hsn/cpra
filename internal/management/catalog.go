@@ -409,7 +409,7 @@ func (c *Catalog) Prepare(ctx context.Context, input api.Resource, expectedVersi
 				return nil, err
 			}
 		}
-		if !jsonEqual(resource.Spec, previous.Spec) {
+		if !desiredSpecEqual(resource.Kind, resource.Spec, previous.Spec) {
 			record.Generation++
 		}
 	}

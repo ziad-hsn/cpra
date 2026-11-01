@@ -66,7 +66,7 @@ func main() {
 					warnings = []api.FieldError{}
 				}
 				advisories, err := json.Marshal(warnings)
-				if err != nil || len(advisories) > 4096 {
+				if err != nil || len(advisories) > 16384 {
 					return errors.New("configuration advisories unavailable")
 				}
 				if !args[1].Invoke(item.ID, item.Location.Document, item.Location.Item, string(item.JSON), string(coordinates), string(advisories)).Bool() {

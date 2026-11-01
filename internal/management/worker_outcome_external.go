@@ -61,6 +61,7 @@ type WorkerOutcomeDisposition struct {
 	Status      string
 	Observation bool
 	Retryable   bool
+	Failure     persistence.FailureDiagnostic
 }
 
 // PreparedWorkerOutcome retains only ciphertext and non-secret identity/status.
@@ -101,6 +102,7 @@ func (c *Catalog) PrepareWorkerOutcome(ctx context.Context, binding WorkerOutcom
 	input.Data = slices.Clone(input.Data)
 	defer clear(input.Data)
 	input.Evidence = slices.Clone(input.Evidence)
+	input.Failure = api.CloneWorkerFailure(input.Failure)
 	if err := c.readyContext(ctx); err != nil {
 		return out, err
 	}
@@ -182,6 +184,23 @@ func validateWorkerOutcome(ctx context.Context, contract api.JobType, binding Wo
 		return out, nil, err
 	}
 	out.Status = input.Status
+	if input.Failure == nil && contract.Spec.ProtocolVersion == "2" && input.Kind == "check" && input.Status == "noData" {
+		f, _ := api.CanonicalFailure(api.FailureTaxonomyVersion, "check.unavailable", "local")
+		out.Failure = persistence.CheckFailure(f)
+	}
+	if input.Failure != nil {
+		if contract.Spec.ProtocolVersion != "2" || input.Kind != "check" || input.Status != "failure" && input.Status != "noData" {
+			return out, nil, ErrWorkerOutcomeInvalid
+		}
+		failure, err := api.CanonicalWorkerFailure(api.ExternalFailureContract{JobTypeID: contract.Metadata.ID, JobTypeUID: contract.Metadata.UID, Version: contract.Spec.Version, ProtocolVersion: contract.Spec.ProtocolVersion, Codes: contract.Spec.FailureCodes}, *input.Failure)
+		if err != nil {
+			return out, nil, ErrWorkerOutcomeInvalid
+		}
+		out.Failure = persistence.CheckFailure(failure)
+		if (input.Status == "noData") != out.Failure.MonitoringUnavailable() {
+			return WorkerOutcomeDisposition{}, nil, ErrWorkerOutcomeInvalid
+		}
+	}
 	switch input.Kind {
 	case "check":
 		if input.Status != "success" && input.Status != "failure" && input.Status != "noData" {

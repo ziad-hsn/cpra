@@ -84,7 +84,22 @@ func Manifest(ctx context.Context, path string, allowEmpty, encryptionAvailable,
 						}
 					}
 				}
-				if m.Intervention.Action != "" {
+				hasAction := m.Intervention.Action != ""
+				for _, rule := range m.Intervention.Rules {
+					hasAction = hasAction || rule.Action != ""
+					if rule.Action == "a2a" && !encryptionAvailable {
+						return fmt.Errorf("A2A rule configuration requires storage.encryption")
+					}
+				}
+				if red, ok := m.Codes["red"]; ok && red.Dispatch && len(m.Intervention.Rules) > 0 && (red.Trigger == "recovery_failed" || red.Trigger == "recovery_exhausted") {
+					warning := api.FieldError{Field: fmt.Sprintf("monitors[%d].codes.red.trigger", len(ids)-1), Reason: "recoveryOnlyCoverage", Message: api.ValidationMessage("recoveryOnlyCoverage")}
+					for _, report := range warnings {
+						if report != nil {
+							report(warning)
+						}
+					}
+				}
+				if hasAction {
 					blue, exists := m.Codes["blue"]
 					if !exists || !blue.Dispatch || blue.Notify == "" && len(batch.NotificationGroups[blue.NotifyGroup]) == 0 {
 						warning := api.FieldError{Field: fmt.Sprintf("monitors[%d].codes.blue", len(ids)-1), Reason: "unknownRecoveryDestination", Message: api.ValidationMessage("unknownRecoveryDestination")}

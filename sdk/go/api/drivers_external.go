@@ -95,7 +95,7 @@ func validateAdditionalResource(r Resource) error {
 		default:
 			return errors.New("invalid JobType kind")
 		}
-		return nil
+		return ValidateJobTypeFailures(spec)
 	}
 	return errors.New("unsupported resource kind")
 }

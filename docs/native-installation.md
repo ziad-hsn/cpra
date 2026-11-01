@@ -361,7 +361,7 @@ the restored policy, and provision fresh operator access before starting it:
 
 ```sh
 cpractl local auth list --data-dir /absolute/path/restored-state
-cpractl local auth reprovision oncall --role operator --data-dir /absolute/path/restored-state --token-output /absolute/path/operator-access/new.token
+cpractl local auth reprovision oncall --mode management --role operator --data-dir /absolute/path/restored-state --token-output /absolute/path/operator-access/new.token
 ```
 
 The token output must be a new protected file outside the state directory. Check
@@ -369,7 +369,10 @@ that the command reports a committed revision and that a subsequent `auth list`
 observes that revision with `resetRequired: false`. An uncertain commit requires
 inspection of its original revision and token file; do not issue another token
 automatically. The previous named tokens and startup read token must not regain
-access. See [local authentication](local-authentication.md).
+access. For an authenticated file-configured installation, use
+`local auth reprovision --mode observation` without a named principal or role;
+keep its read-only runtime mode. See [local authentication](local-authentication.md)
+for both complete procedures.
 
 Retain the matching runtime configuration, TLS sources and encryption wrapping
 key separately from the complete state backup. Service installation repairs
@@ -399,7 +402,7 @@ state or external interventions. Native crash/restart tests establish the
 tested OS/filesystem boundary; they do not claim universal power-loss durability.
 
 Current monitor configuration, check and action transitions use storage format
-46; combining this state with optional external-worker state uses format 47. The
+48; combining this state with optional external-worker state uses format 49. The
 recorded format determines replay behavior: supported earlier commands retain
 their original transition semantics. The reader must support both the stored
 format and any optional worker state. An older executable must reject a state

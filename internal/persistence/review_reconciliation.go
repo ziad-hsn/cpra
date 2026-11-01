@@ -360,7 +360,7 @@ func (f *machine) applyReviewItem(c Command) Result {
 					value := *saved.Alert
 					alert = &value
 				} else {
-					alert = &ReviewAlert{Owner: &reviewAlertOwner{CatalogUID: context.CatalogUID, FileIncarnation: context.FileIncarnation}, ID: id, ActionID: a.ID, IncidentID: context.IncidentID, Revision: context.Revision, EndpointID: endpointID, Endpoint: endpoint, OpenedAt: fact.At, Health: context.observedHealth(), ProviderCorrelationVersion: 1}
+					alert = &ReviewAlert{Binding: context.reviewBinding(endpoint), Owner: &reviewAlertOwner{CatalogUID: context.CatalogUID, FileIncarnation: context.FileIncarnation}, ID: id, ActionID: a.ID, IncidentID: context.IncidentID, Revision: context.Revision, EndpointID: endpointID, Endpoint: endpoint, OpenedAt: fact.At, Health: context.observedHealth(), ProviderCorrelationVersion: 1}
 					newAlert = true
 				}
 				fact.Endpoint++
@@ -450,7 +450,7 @@ func (f *machine) applyReviewItem(c Command) Result {
 				if e != nil {
 					return Result{Err: e}
 				}
-				binding := a.CatalogUID == next.CatalogUID && a.FileIncarnation == next.FileIncarnation && a.Revision == next.Revision && !next.Removed && a.Endpoint < next.Policy.Endpoints["blue"] && notificationEndpointIdentity(next, "blue", a.Endpoint) == a.EndpointID
+				binding := a.CatalogUID == next.CatalogUID && a.FileIncarnation == next.FileIncarnation && next.ActionConfigurationCurrent(a) && !next.Removed && a.Endpoint < next.Policy.Endpoints["blue"] && notificationEndpointIdentity(next, "blue", a.Endpoint) == a.EndpointID
 				if fact.RestoreID != f.reviewRestoreID() {
 					next.cancelNotification(a, "explicit_restore", c.At, emit)
 				} else if !binding {

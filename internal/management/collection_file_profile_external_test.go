@@ -32,7 +32,7 @@ func fileProfileExternalResources(t *testing.T) map[string]api.Resource {
 		resources[name] = api.Resource{APIVersion: api.APIVersion, Kind: "Monitor", Metadata: api.Metadata{ID: "service"}, Spec: json.RawMessage(spec)}
 	}
 	resources["endpoint"] = api.Resource{APIVersion: api.APIVersion, Kind: "NotificationEndpoint", Metadata: api.Metadata{ID: "endpoint"}, Spec: json.RawMessage(external)}
-	resources["jobType"] = api.Resource{APIVersion: api.APIVersion, Kind: "JobType", Metadata: api.Metadata{ID: "private-job"}, Spec: json.RawMessage(`{"kind":"check","handler":"handler","protocolVersion":"v1","version":"v1"}`)}
+	resources["jobType"] = api.Resource{APIVersion: api.APIVersion, Kind: "JobType", Metadata: api.Metadata{ID: "private-job"}, Spec: json.RawMessage(`{"kind":"check","handler":"handler","protocolVersion":"1","version":"v1"}`)}
 	for name, r := range resources {
 		raw, _ := json.Marshal(r)
 		if _, err := api.DecodeResource(raw); err != nil {

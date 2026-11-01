@@ -11,6 +11,7 @@ import (
 )
 
 var errAdmissionRecovering = errors.New("controller is reconciling committed work")
+var errOwnerProjection = errors.New("committed reply has an inconsistent controller projection")
 
 // Only the ECS owner submits these writes. Keeping the submission boundary
 // separate also permits lost-reply tests against the real state machine.
@@ -84,7 +85,7 @@ func (s *DurableSystem) advanceOwnerWrite(ctx context.Context) error {
 			return err
 		}
 		if len(results) != len(p.commands) {
-			return persistence.ErrCommitUnconfirmed
+			return errOwnerProjection
 		}
 		p.results, p.confirmed = results, true
 	}
@@ -147,7 +148,7 @@ func (s *DurableSystem) recoverWrites(now time.Time) bool {
 func (s *DurableSystem) recoveryError(err error, ctx context.Context) {
 	// An expired bounded recovery attempt remains unresolved. It is not evidence
 	// of success, nor permission to generate a replacement command.
-	if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
+	if errors.Is(err, persistence.ErrCommitUnconfirmed) || persistence.IsLeadershipUnavailable(err) || ctx.Err() != nil && errors.Is(err, ctx.Err()) {
 		s.recovering.Store(true)
 		return
 	}
@@ -174,6 +175,9 @@ func (s *DurableSystem) resultsBuffered() bool {
 }
 
 func (s *DurableSystem) releaseResult(r jobs.Result) {
+	if r.ReleaseDispatch != nil {
+		r.ReleaseDispatch()
+	}
 	delete(s.admitted, r.ActionID)
 	if r.Type == "pulse" && s.pendingCheckID[r.MonitorID] == r.ID {
 		delete(s.pending, r.MonitorID)

@@ -82,6 +82,9 @@ func resolutionRetainsAction(v NotificationResolution) bool {
 	return false
 }
 func (f *machine) actionRetirementBlocked(m Monitor, a Action) (bool, error) {
+	if a.NotificationPermit != nil && a.NotificationFeedbackDigest == "" && a.ExecutorSession == f.image.LocalExecutorSession {
+		return true, nil
+	}
 	if m.ActionProjection == nil || !f.projectionsEnabled() {
 		return true, nil
 	}

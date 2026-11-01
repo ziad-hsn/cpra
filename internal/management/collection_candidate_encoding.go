@@ -37,7 +37,7 @@ func collectionCandidateEncoding(normalized api.Resource, original *api.Resource
 			return shape, nil
 		}
 		encoded.Metadata.UID = original.Metadata.UID
-		if !jsonEqual(normalized.Spec, original.Spec) {
+		if !desiredSpecEqual(normalized.Kind, normalized.Spec, original.Spec) {
 			if shape.Generation == math.MaxInt64 {
 				return collectionCandidateLayout{}, ErrValidation
 			}

@@ -86,7 +86,7 @@ export default function MonitorDetail() {
 		{m.configuration_problem && <p>Current health is unknown because local preparation prevents checks. Last target observation: {m.last_observed_health ?? 'unknown'} at {formatDateTime(m.last_observed_at ?? '')}. Preparation will be retried at the normal check interval; recovery actions are blocked meanwhile.</p>}
         {m.certificate_verification_disabled && <p role='status'>TLS certificate verification disabled for this monitor.</p>}
         {m.configuration_warnings?.includes('unknownRecoveryDestination') && <p className="warning">Uncertain recovery has no enabled blue notification destination. Its action will remain held for operator review.</p>}
-        <p>Pending notifications: {m.pending_notifications ?? 'Unavailable'} · Accepted (retained): {m.completed_notifications ?? 'Unavailable'} · Failed (retained): {m.failed_notifications ?? 'Unavailable'} · Actions needing review: {m.actions_needing_review ?? 'Unavailable'}</p>
+        <p>Pending notifications: {m.pending_notifications ?? 'Unavailable'} · Accepted (retained): {m.completed_notifications ?? 'Unavailable'} · Cancelled (retained): {m.cancelled_notifications ?? 'Unavailable'} · Failed (retained): {m.failed_notifications ?? 'Unavailable'} · Actions needing review: {m.actions_needing_review ?? 'Unavailable'}</p>
         <p className='muted'>Acceptance records the provider response; it does not prove a recipient received the notification.</p>
       </div>
 

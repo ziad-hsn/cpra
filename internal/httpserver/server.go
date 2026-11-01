@@ -570,7 +570,9 @@ func (s *Server) handleMonitorsList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filtered := make([]MonitorSummaryJSON, 0, len(snap.Monitors))
+	availability := s.holder.ControllerAvailability()
 	for _, m := range snap.Monitors {
+		m = fleetview.WithControllerAvailability(m, availability)
 		if status != "" && m.Status != status {
 			continue
 		}
@@ -661,6 +663,7 @@ func (s *Server) handleMonitorDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) writeMonitorDetail(w http.ResponseWriter, r *http.Request, row fleetview.MonitorSummary) {
+	row = s.holder.Observation(row)
 	if s.cfg.Store == nil || s.managementHTTP == nil {
 		row.NotificationConditionsTruncated = true
 		row.NotificationConditionsObservedAt = time.Time{}
@@ -707,6 +710,9 @@ func (s *Server) handleIncidents(w http.ResponseWriter, r *http.Request) {
 			offset = (page - 1) * size
 		}
 		rows, count := index.Page(offset, size, func(m fleetview.MonitorSummary) bool { return m.Incident })
+		for i := range rows {
+			rows[i] = s.holder.Observation(rows[i])
+		}
 		writeJSON(w, 200, incidentsResp{Generated: index.Overview().Generated, Count: count, Incidents: rows})
 		return
 	}
@@ -720,9 +726,10 @@ func (s *Server) handleIncidents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	incidents := make([]MonitorSummaryJSON, 0)
+	availability := s.holder.ControllerAvailability()
 	for _, m := range snap.Monitors {
 		if m.Incident || m.Status == "incident" {
-			incidents = append(incidents, m)
+			incidents = append(incidents, fleetview.WithControllerAvailability(m, availability))
 		}
 	}
 	writeJSON(w, http.StatusOK, incidentsResp{
@@ -848,6 +855,20 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	var b metricWriter
+	if s.cfg.Store != nil {
+		for _, row := range s.cfg.Store.ActionMetrics() {
+			writeCounter(&b, "cpra_action_cancellations_total", "Action cancellation transitions committed since store open; excludes historical replay.", []kv{{"pipeline", row.Pipeline}}, float64(row.Cancelled))
+			writeCounter(&b, "cpra_action_definite_rejections_total", "Permanent proven-no-effect failures committed since store open; excludes unknown effects and historical replay.", []kv{{"pipeline", row.Pipeline}}, float64(row.PermanentRejection))
+			for _, reason := range []struct {
+				name  string
+				count uint64
+			}{
+				{"attempt_limit", row.AttemptLimit}, {"execution_deadline", row.ExecutionDeadline},
+			} {
+				writeCounter(&b, "cpra_action_exhaustions_total", "Definite terminal limits committed since store open; excludes retryable attempts, unknown effects and historical replay.", []kv{{"pipeline", row.Pipeline}, {"reason", reason.name}}, float64(reason.count))
+			}
+		}
+	}
 
 	snap := s.holder.Get()
 	if snap != nil {
@@ -878,6 +899,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		lbl := []kv{{"queue", name}}
 		writeGauge(&b, "cpra_queue_depth", "Current queue depth.", lbl, float64(qs.QueueDepth))
 		writeGauge(&b, "cpra_queue_capacity", "Queue capacity.", lbl, float64(qs.Capacity))
+		writeGauge(&b, "cpra_queue_awaiting_reconciliation", "Completed notification dispatches retaining reservations until owner reconciliation.", lbl, float64(qs.AwaitingReconciliation))
 		writeCounter(&b, "cpra_queue_enqueued_total", "Total jobs enqueued.", lbl, float64(qs.Enqueued))
 		writeCounter(&b, "cpra_queue_dequeued_total", "Total jobs dequeued.", lbl, float64(qs.Dequeued))
 		writeCounter(&b, "cpra_queue_dropped_total", "Total jobs dropped.", lbl, float64(qs.Dropped))
@@ -893,6 +915,11 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 			driverLabels := []kv{{"pipeline", name}, {"driver", d.Driver}}
 			writeGauge(&b, "cpra_driver_requested_capacity", "Configured timeout occupancy reservation in workers, before global limits.", driverLabels, float64(d.RequestedCapacity))
 			writeGauge(&b, "cpra_driver_reserved_capacity", "Reservation supplied from the current global worker budget.", driverLabels, float64(d.ReservedCapacity))
+			writeGauge(&b, "cpra_driver_worker_headroom", "Driver worker allowance minus active work; pacing, ordering and durable admission can further restrict execution.", driverLabels, float64(d.WorkerHeadroom))
+			writeCounter(&b, "cpra_driver_rate_deferred_total", "Queued admissions observed waiting for pacing, counted once per admitted copy.", driverLabels, float64(d.RateDeferredTotal))
+			if d.DestinationConcurrency != nil {
+				writeGauge(&b, "cpra_driver_destination_concurrency", "Configured per-destination ceiling before pacing and global limits.", driverLabels, float64(*d.DestinationConcurrency))
+			}
 			writeGauge(&b, "cpra_driver_pending", "Admitted work still in the driver queue.", driverLabels, float64(d.Pending))
 			writeGauge(&b, "cpra_driver_inflight", "Queue leases held through submission, invocation and result handoff.", driverLabels, float64(d.Active))
 			writeCounter(&b, "cpra_driver_rejections_total", "Driver queue admission rejections.", driverLabels, float64(d.Rejections))

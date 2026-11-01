@@ -2,8 +2,6 @@
 
 package persistence
 
-import "encoding/json"
-
 type catalogRecordExtensions struct{}
 
 func cloneCatalogRecordExtensions(CatalogRecord) catalogRecordExtensions {
@@ -16,5 +14,5 @@ func validateCatalogRecordImageExtensions(image, CatalogRecord, bool) error     
 func addCatalogRecordExtensions(map[string]map[string]struct{}, CatalogRecord)         {}
 func (*machine) installCatalogRecordExtensions(catalogRecordExtensions, CatalogRecord) {}
 func operationDigestEncoding(c Command) ([]byte, error) {
-	return json.Marshal(legacyOperationCommandDigest(c))
+	return recoveryRuleOperationDigest(c)
 }

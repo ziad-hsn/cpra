@@ -33,10 +33,8 @@ func ValidateResourceSettings(resource Resource) error {
 		if err := ValidateDriverSettings("check", spec.Check.Driver); err != nil {
 			return PrefixValidationError("spec.check.driver", err)
 		}
-		if spec.Recovery != nil {
-			if err := ValidateDriverSettings("recovery", spec.Recovery.Driver); err != nil {
-				return PrefixValidationError("spec.recovery.driver", err)
-			}
+		if err := ValidateRecoverySettings(spec.Check.Driver, spec.Recovery); err != nil {
+			return PrefixValidationError("spec.recovery", err)
 		}
 		if spec.Notifications != nil {
 			for color, rule := range *spec.Notifications {

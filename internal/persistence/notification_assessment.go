@@ -215,7 +215,7 @@ func validateNotificationState(m Monitor, version int) error {
 	if err := m.validateResolutionConditions(version); err != nil {
 		return err
 	}
-	if !actionStorageFormat(version) || m.ActionVersion != ActionFormatVersion || s.OutsideFailures < 0 || s.OutsideFailures > max(1, m.Policy.Unhealthy) {
+	if !actionStorageFormat(version) || !actionStateVersion(m.ActionVersion) || s.OutsideFailures < 0 || s.OutsideFailures > max(1, m.Policy.Unhealthy) {
 		return errors.New("invalid notification assessment")
 	}
 	for _, id := range []string{s.QualifiedIncident, s.IgnoreOutage} {

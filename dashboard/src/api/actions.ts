@@ -1,9 +1,20 @@
-import type { Action, ActionReview, AgentReceipt, RecoveryFailure, ResolutionNotice, ReviewNotice } from './generated';
+import type { Action, ActionReview, AgentReceipt, RecoveryFailure, RecoverySelection, ResolutionNotice, ReviewNotice } from './generated';
 import { DashboardSession, ManagementError } from './session';
 import { object } from './value';
 import { failureView } from './failure';
 
 function invalid(): never { throw new ManagementError('invalid', 'The action response could not be safely identified.'); }
+
+function recoverySelectionView(value: unknown): RecoverySelection {
+  if (!object(value)) return invalid();
+  const fields = ['ruleID', 'driver', 'configurationRevision', 'decisionRevision', 'incidentID', 'observationID'] as const;
+  for (const key of fields) {
+    if (typeof value[key] !== 'string' || !value[key] || new TextEncoder().encode(value[key]).byteLength > 256 || /\p{Cc}/u.test(value[key])) return invalid();
+  }
+  return { ruleID: value.ruleID as string, driver: value.driver as string,
+    configurationRevision: value.configurationRevision as string, decisionRevision: value.decisionRevision as string,
+    incidentID: value.incidentID as string, observationID: value.observationID as string };
+}
 
 /** Retain correlation only, without agent output or supplied links. */
 export function agentReceiptView(value: unknown): AgentReceipt {
@@ -48,6 +59,7 @@ export function actionView(value: unknown, monitorID: string, expectedID?: strin
   if (value.agentReceipt !== undefined) action.agentReceipt = agentReceiptView(value.agentReceipt);
   if (value.reviewNotice !== undefined) action.reviewNotice = reviewNoticeView(value.reviewNotice);
   if (value.recoveryFailure !== undefined) action.recoveryFailure = recoveryFailureView(value.recoveryFailure);
+  if (value.recoverySelection !== undefined) action.recoverySelection = recoverySelectionView(value.recoverySelection);
   if (value.resolution !== undefined) action.resolution = resolutionNoticeView(value.resolution);
   if (value.executionBudget !== undefined && value.executionBudget !== '') {
     if (typeof value.executionBudget !== 'string' || value.executionBudget.length > 128 || !/^\+?(?:\d+(?:\.\d*)?|\.\d+)(?:ns|us|µs|μs|ms|s|m|h)(?:(?:\d+(?:\.\d*)?|\.\d+)(?:ns|us|µs|μs|ms|s|m|h))*$/.test(value.executionBudget) || !/[1-9]/.test(value.executionBudget)) return invalid();

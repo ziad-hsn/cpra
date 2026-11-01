@@ -38,7 +38,7 @@ func TestCatalogJobTypeDefaultExclusion(t *testing.T) {
 			t.Fatal("default exposed version lookup", method)
 		}
 	}
-	if supportedFormat(18) || LatestFormatVersion != ActionFormatVersion {
+	if supportedFormat(18) || LatestFormatVersion != DispatchFormatVersion {
 		t.Fatal("default enabled external reference format")
 	}
 	if _, _, err := decodeSnapshot(bytes.NewBufferString("CPRA-COLLECTION-SNAPSHOT-18\n{}"), ""); err == nil {

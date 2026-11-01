@@ -49,6 +49,28 @@ func TestCompletedMonitorQueriesReclaimRetainedViews(t *testing.T) {
 	}
 }
 
+func TestRapidAbandonedFirstPagesReclaimViews(t *testing.T) {
+	f := newManagementFixture(t, true)
+	for _, id := range []string{"one", "two"} {
+		configureControlMonitor(t, f, id)
+	}
+	first := ""
+	for i := range 3 * managementPrincipalSnapshots {
+		response, raw := f.request(t, "GET", "/api/v2/monitors?limit=1", managementOperatorToken, nil, nil)
+		var page struct{ NextCursor string }
+		if response.StatusCode != 200 || json.Unmarshal(raw, &page) != nil || page.NextCursor == "" {
+			t.Fatal("new first page", i, response.StatusCode, string(raw))
+		}
+		if first == "" {
+			first = page.NextCursor
+		}
+	}
+	response, _ := f.request(t, "GET", "/api/v2/monitors?limit=1&cursor="+url.QueryEscape(first), managementOperatorToken, nil, nil)
+	if response.StatusCode != 410 {
+		t.Fatal("evicted view reconstructed", response.StatusCode)
+	}
+}
+
 func TestCursorReclamationPreservesReadersAndPrefersCompleted(t *testing.T) {
 	now := time.Now().UTC()
 	m := &managementHTTP{snapshots: make(map[string]managementSnapshot), now: func() time.Time { return now }}
@@ -57,7 +79,7 @@ func TestCursorReclamationPreservesReadersAndPrefersCompleted(t *testing.T) {
 			activity: &cursorActivity{readers: readers, completed: complete, lastUsed: now.Add(-age)}}
 	}
 	m.snapshots["reading"] = entry("alice", 1, true, time.Minute)
-	m.snapshots["idle"] = entry("alice", 0, false, time.Minute)
+	m.snapshots["idle"] = entry("alice", 0, false, time.Millisecond)
 	m.snapshots["completed"] = entry("alice", 0, true, time.Second)
 	m.snapshots["other"] = entry("bob", 0, true, time.Minute)
 	m.mu.Lock()

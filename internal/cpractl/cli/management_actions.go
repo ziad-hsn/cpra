@@ -63,7 +63,7 @@ func runManagementActionGet(cmd *cobra.Command, o *options, args []string, descr
 
 func addManagementActionCommands(root *cobra.Command, o *options) {
 	for _, action := range []string{"recover", "review"} {
-		var revision, reasonFile, noteFile, evidenceFile, resolution string
+		var revision, reasonFile, noteFile, evidenceFile, resolution, ruleID, decisionRevision, configurationRevision string
 		target, flag, description := "monitor/ID", "control-revision", "Request one guarded recovery; the receipt is not proof of provider success"
 		if action == "review" {
 			target, flag, description = "action/ID", "review-revision", "Audit an unknown action without changing its recorded provider outcome or replaying it"
@@ -71,6 +71,11 @@ func addManagementActionCommands(root *cobra.Command, o *options) {
 		command := &cobra.Command{Use: action + " " + target, Short: description, Args: cobra.RangeArgs(1, 2)}
 		command.Flags().StringVar(&revision, flag, "", "exact observed version; never fetched or replaced automatically")
 		command.Flags().StringVar(&reasonFile, "reason-file", "", "required UTF-8 reason file; - reads stdin; retained in audit history")
+		if action == "recover" {
+			command.Flags().StringVar(&ruleID, "rule-id", "", "currently qualified rule ID; required for rule-based recovery")
+			command.Flags().StringVar(&decisionRevision, "decision-revision", "", "exact observed rule decision revision")
+			command.Flags().StringVar(&configurationRevision, "configuration-revision", "", "exact runtime configuration revision in the rule observation")
+		}
 		if action == "review" {
 			command.Flags().StringVar(&resolution, "resolution", "", "accepted, rejected or inconclusive; an operator assertion separate from provider facts")
 			command.Flags().StringVar(&noteFile, "note-file", "", "optional UTF-8 note file; - reads stdin")
@@ -103,7 +108,10 @@ func addManagementActionCommands(root *cobra.Command, o *options) {
 			if stdinInputs > 1 {
 				return errors.New("only one audit input may read stdin; use files for the remaining inputs")
 			}
-			request := api.ControlRequest{Revision: revision, Resolution: resolution}
+			if (ruleID != "" || decisionRevision != "" || configurationRevision != "") && (ruleID == "" || !validManagementVersion(decisionRevision) || !validManagementVersion(configurationRevision)) {
+				return errors.New("rule recovery requires --rule-id, --decision-revision and --configuration-revision together")
+			}
+			request := api.ControlRequest{Revision: revision, Resolution: resolution, RuleID: ruleID, DecisionRevision: decisionRevision, ConfigurationRevision: configurationRevision}
 			request.Reason, err = readManagementControlText(cmd, reasonFile, true)
 			if err == nil && action == "review" {
 				request.Note, err = readManagementControlText(cmd, noteFile, false)

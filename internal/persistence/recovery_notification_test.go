@@ -253,7 +253,7 @@ func TestRecoveryNotificationSnapshotAndFormatBoundary(t *testing.T) {
 	config := testMonitor()
 	config.Policy = m.Policy
 	c := Command{Kind: "configure", MonitorID: config.ID, Revision: config.Revision, Config: &config, At: policyTime()}
-	if err := validateCommand(c); err != nil || commandWriteFormat(c) != ActionFormatVersion || commandMinimumFormat(c) != RecoveryNotificationFormatVersion {
+	if err := validateCommand(c); err != nil || commandWriteFormat(c) != DispatchFormatVersion || commandMinimumFormat(c) != RecoveryNotificationFormatVersion {
 		t.Fatal("configuration has no explicit format boundary", err)
 	}
 	raw, _ := json.Marshal(envelope{Version: AgentActionFormatVersion, Commands: []Command{c}})
@@ -271,7 +271,7 @@ func TestRecoveryNotificationSnapshotAndFormatBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	if i.Version != ActionFormatVersion || len(recoveryNotificationActions(i.Monitors[m.ID])) != 2 {
+	if i.Version != DispatchFormatVersion || len(recoveryNotificationActions(i.Monitors[m.ID])) != 2 {
 		t.Fatal("snapshot lost committed failure notification policy or intents")
 	}
 	for _, row := range recoveryNotificationActions(i.Monitors[m.ID]) {

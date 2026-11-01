@@ -112,6 +112,9 @@ func (i WorkerExecutionIntent) validate() error {
 }
 
 func (i WorkerExecutionIntent) minimumFormat() int {
+	if i.ExecutionBudget > 0 && i.Category == "recovery" {
+		return WorkerDispatchFormatVersion
+	}
 	if i.ExecutionBudget > 0 || i.Notification != nil && i.Notification.Format == 2 {
 		return WorkerNotificationConditionFormatVersion
 	}
@@ -237,6 +240,9 @@ func workerExecutionDigest(i WorkerExecutionIntent) string {
 			Notification *WorkerNotification           `json:"notification"`
 			Budget       time.Duration                 `json:"execution_budget"`
 		}{projection, i.Notification, i.ExecutionBudget})
+		if i.Category == "recovery" {
+			return identity("cpra/worker/execution-intent/v5\x00" + string(value))
+		}
 		return identity("cpra/worker/execution-intent/v4\x00" + string(value))
 	}
 	if i.Notification != nil {

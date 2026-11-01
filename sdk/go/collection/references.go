@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
 // Reference identifies a dependency independently of its display name.
@@ -44,7 +46,7 @@ func ValidateReferences(ctx context.Context, frozen *Frozen, resolve ResolveRefe
 				continue
 			}
 			if resolve == nil {
-				return fmt.Errorf("%s: missing %s/%s", item.Location, reference.Kind, reference.ID)
+				return item.ValidationError(api.InvalidField("spec", "missingReference"))
 			}
 			version, err := resolve(ctx, reference)
 			if err != nil {

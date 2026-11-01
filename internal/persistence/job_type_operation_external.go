@@ -36,16 +36,38 @@ type JobTypeCommitResult struct {
 // later command additions. Both old replay digests and new reservation intent
 // hashes use this explicit projection.
 type jobTypeCommandDigestV1 struct {
-	Action                  string            `json:"action"`
-	Value                   JobTypeVersion    `json:"value"`
-	ExpectedUID             string            `json:"expected_uid,omitempty"`
-	ExpectedRevision        string            `json:"expected_revision,omitempty"`
-	RetainedVersionRevision string            `json:"retained_version_revision,omitempty"`
-	Authority               OperatorAuthority `json:"authority"`
+	Action                  string                 `json:"action"`
+	Value                   jobTypeVersionDigestV1 `json:"value"`
+	ExpectedUID             string                 `json:"expected_uid,omitempty"`
+	ExpectedRevision        string                 `json:"expected_revision,omitempty"`
+	RetainedVersionRevision string                 `json:"retained_version_revision,omitempty"`
+	Authority               OperatorAuthority      `json:"authority"`
+}
+
+type jobTypeVersionDigestV1 struct {
+	Record          CatalogRecord `json:"record"`
+	Version         string        `json:"version"`
+	Category        string        `json:"category"`
+	Handler         string        `json:"handler"`
+	ProtocolVersion string        `json:"protocol_version"`
+	SchemaProfile   string        `json:"schema_profile"`
 }
 
 func jobTypeCommandV1(c JobTypeCommand) jobTypeCommandDigestV1 {
-	return jobTypeCommandDigestV1{Action: c.Action, Value: c.Value, ExpectedUID: c.ExpectedUID, ExpectedRevision: c.ExpectedRevision, RetainedVersionRevision: c.RetainedVersionRevision, Authority: c.Authority}
+	v := c.Value
+	return jobTypeCommandDigestV1{Action: c.Action, Value: jobTypeVersionDigestV1{v.Record, v.Version, v.Category, v.Handler, v.ProtocolVersion, v.SchemaProfile}, ExpectedUID: c.ExpectedUID, ExpectedRevision: c.ExpectedRevision, RetainedVersionRevision: c.RetainedVersionRevision, Authority: c.Authority}
+}
+
+func jobTypeDigestEncoding(c JobTypeCommand) ([]byte, string, error) {
+	if c.Value.ProtocolVersion == "1" && len(c.Value.FailureCodes) == 0 {
+		raw, err := json.Marshal(jobTypeCommandV1(c))
+		return raw, "v1", err
+	}
+	raw, err := json.Marshal(struct {
+		Command      jobTypeCommandDigestV1 `json:"command"`
+		FailureCodes []string               `json:"failure_codes"`
+	}{jobTypeCommandV1(c), c.Value.FailureCodes})
+	return raw, "v2", err
 }
 
 func operationResourceCommand(kind string) bool { return kind == "catalog" || kind == "job_type" }
@@ -83,11 +105,11 @@ func jobTypeOperationReservation(c JobTypeCommand, at time.Time) (OperationReser
 	if err := c.validate(c.Value.Record.UpdatedAt); err != nil {
 		return OperationReservation{}, err
 	}
-	raw, err := json.Marshal(jobTypeCommandV1(c))
+	raw, version, err := jobTypeDigestEncoding(c)
 	if err != nil {
 		return OperationReservation{}, ErrJobTypeInvalid
 	}
-	digest := sha256.Sum256(append([]byte("cpra-job-type-operation-v1\x00"), raw...))
+	digest := sha256.Sum256(append([]byte("cpra-job-type-operation-"+version+"\x00"), raw...))
 	v := c.Value.Record
 	return OperationReservation{CommandKind: "job_type", Digest: hex.EncodeToString(digest[:]), ExpiresAt: at.Add(OperationReservationLifetime), OperationReceipt: OperationReceipt{
 		Key: v.Key, UID: v.UID, OldVersion: c.ExpectedRevision, NewVersion: v.Revision, Generation: v.Generation,

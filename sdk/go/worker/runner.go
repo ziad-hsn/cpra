@@ -296,6 +296,10 @@ func (r *Runner) poll(ctx context.Context, capabilities []api.WorkerCapability, 
 			fail(err)
 			return
 		}
+		if err := r.config.Registry.validateContracts(batch.Items); err != nil {
+			fail(err)
+			return
+		}
 		sessionID, expires = batch.SessionID, batch.SessionExpiresAt
 		if len(batch.Items) != 0 {
 			// Detach assignment parameters before ownership passes to execution slots.
@@ -519,6 +523,9 @@ func truncateDiagnostic(d string, limit int) (string, bool) {
 }
 
 func (r *Runner) saveOutcome(id string, out api.Outcome, fail func(error)) {
+	out.Failure = api.CloneWorkerFailure(out.Failure)
+	out.Data = append([]byte(nil), out.Data...)
+	out.Evidence = append([]string(nil), out.Evidence...)
 	err := r.journal.update(id, func(rec *journalRecord) error {
 		out.ServerID = rec.Start.ServerID
 		out.WorkerUID = rec.WorkerUID
@@ -528,8 +535,8 @@ func (r *Runner) saveOutcome(id string, out api.Outcome, fail func(error)) {
 		if rec.Kind == "check" && (out.Status == "unknown" || out.Status == "rejected") {
 			out.Status = "noData"
 		}
-		if !validOutcome(rec.Kind, out.Status) {
-			out = unknownOutcome(rec.Kind, "worker returned an invalid outcome status")
+		if !validOutcome(rec.Kind, out.Status) || !recordFailureValid(*rec, out) {
+			out = unknownOutcome(rec.Kind, "worker returned an invalid outcome or failure classification")
 			out.ServerID = rec.Start.ServerID
 			out.WorkerUID = rec.WorkerUID
 			out.ExecutionID = id

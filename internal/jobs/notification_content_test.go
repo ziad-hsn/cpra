@@ -141,7 +141,11 @@ func TestNotificationWebhookCommittedIdentityAndTimestamp(t *testing.T) {
 	if prototype.notification.MonitorID != "" {
 		t.Fatal("dispatch mutated reusable template")
 	}
-	if strings.Contains(buildCodeNotificationMessage("Service", codeAlertTemplateFor("yellow")), "beyond safe thresholds") {
-		t.Fatal("first failure claims threshold reached")
+	yellow := buildCodeNotificationMessage("Service", codeAlertTemplateFor("yellow"))
+	if strings.Contains(yellow, "beyond safe thresholds") || strings.Contains(yellow, "threshold may") {
+		t.Fatal("yellow notification guesses threshold state")
+	}
+	if strings.Contains(buildCodeNotificationMessage("Service", codeAlertTemplateFor("red")), "Perform manual recovery") {
+		t.Fatal("red notification must not prescribe an intervention outside its policy")
 	}
 }

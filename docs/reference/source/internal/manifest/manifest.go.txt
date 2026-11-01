@@ -519,17 +519,21 @@ func (p *Pulse) UnmarshalJSON(data []byte) error {
 //// INTERVENTION TYPES
 
 type Intervention struct {
-	Target      InterventionTarget `yaml:"target" json:"target"`
-	Action      string             `yaml:"action" json:"action"`
-	Retries     int                `yaml:"retries" json:"retries"`
-	MaxFailures int                `yaml:"max_failures" json:"max_failures"`
-	MaxAttempts int                `yaml:"max_attempts,omitempty" json:"max_attempts,omitempty"`
+	TaxonomyVersion string             `yaml:"taxonomy_version,omitempty" json:"taxonomy_version,omitempty"`
+	Rules           []InterventionRule `yaml:"rules,omitempty" json:"rules,omitempty"`
+	Target          InterventionTarget `yaml:"target" json:"target"`
+	Action          string             `yaml:"action" json:"action"`
+	Retries         int                `yaml:"retries" json:"retries"`
+	MaxFailures     int                `yaml:"max_failures" json:"max_failures"`
+	MaxAttempts     int                `yaml:"max_attempts,omitempty" json:"max_attempts,omitempty"`
 }
 type rawIntervention struct {
-	MaxAttempts int    `yaml:"max_attempts"`
-	MaxFailures int    `yaml:"max_failures"`
-	Action      string `yaml:"action"`
-	Retries     int    `yaml:"retries"`
+	TaxonomyVersion string             `yaml:"taxonomy_version"`
+	Rules           []InterventionRule `yaml:"rules"`
+	MaxAttempts     int                `yaml:"max_attempts"`
+	MaxFailures     int                `yaml:"max_failures"`
+	Action          string             `yaml:"action"`
+	Retries         int                `yaml:"retries"`
 }
 
 func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
@@ -539,6 +543,13 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 	}
 	if err := value.Decode(&temp); err != nil {
 		return err
+	}
+	if temp.Rules != nil || temp.TaxonomyVersion != "" {
+		if temp.Action != "" || temp.Target.Kind != 0 {
+			return api.InvalidField("intervention", "recoveryChoice")
+		}
+		*i = Intervention{Rules: temp.Rules, TaxonomyVersion: temp.TaxonomyVersion, Retries: temp.Retries, MaxFailures: temp.MaxFailures, MaxAttempts: temp.MaxAttempts}
+		return nil
 	}
 	if err := checkYAMLDurations(&temp.Target, "intervention.target", "timeout", "operation_timeout", "request_timeout", "task_timeout", "poll_interval"); err != nil {
 		return err
@@ -595,15 +606,25 @@ func (i *Intervention) UnmarshalYAML(value *yaml.Node) error {
 // UnmarshalJSON handles JSON unmarshaling for Intervention (needed for JSON parser)
 func (i *Intervention) UnmarshalJSON(data []byte) error {
 	var temp struct {
-		Action      string          `json:"action"`
-		MaxAttempts int             `json:"max_attempts"`
-		MaxFailures int             `json:"max_failures"`
-		Target      json.RawMessage `json:"target"`
-		Retries     int             `json:"retries"`
+		TaxonomyVersion string             `json:"taxonomy_version"`
+		Rules           []InterventionRule `json:"rules"`
+		Action          string             `json:"action"`
+		MaxAttempts     int                `json:"max_attempts"`
+		MaxFailures     int                `json:"max_failures"`
+		Target          json.RawMessage    `json:"target"`
+		Retries         int                `json:"retries"`
 	}
 
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return jsonFieldError("intervention", err)
+	}
+
+	if temp.Rules != nil || temp.TaxonomyVersion != "" {
+		if temp.Action != "" || temp.Target != nil {
+			return api.InvalidField("intervention", "recoveryChoice")
+		}
+		*i = Intervention{Rules: temp.Rules, TaxonomyVersion: temp.TaxonomyVersion, Retries: temp.Retries, MaxFailures: temp.MaxFailures, MaxAttempts: temp.MaxAttempts}
+		return nil
 	}
 
 	*i = Intervention{

@@ -44,7 +44,7 @@ func validateRecoveryNotificationPolicy(p Policy) error {
 		return ErrRecoveryNotificationInvalid
 	}
 	for color, trigger := range p.NotificationTriggers {
-		if color != "red" || !p.Intervention || !catalogIdentifier(p.RecoveryDriver, 128) ||
+		if color != "red" || !p.Intervention || p.RecoveryRules.IsZero() && !catalogIdentifier(p.RecoveryDriver, 128) ||
 			(trigger != NotifyRecoveryExhausted && trigger != NotifyRecoveryFailed) {
 			return ErrRecoveryNotificationInvalid
 		}
@@ -89,7 +89,11 @@ func (m *Monitor) queueRecoveryFailure(action Action, at time.Time, emit func(st
 	if trigger == "" || trigger == NotifyRecoveryExhausted && action.Attempt < m.Policy.recoveryLimit() && (!m.notificationConditionsEnabled() || action.TerminationReason == "") {
 		return
 	}
-	failure := RecoveryFailure{ActionID: action.ID, Driver: m.Policy.RecoveryDriver, Attempt: action.Attempt, MaxAttempts: m.Policy.recoveryLimit(),
+	driver := m.Policy.RecoveryDriver
+	if action.Rule != (RecoverySelection{}) {
+		driver = action.Rule.Target.Driver
+	}
+	failure := RecoveryFailure{ActionID: action.ID, Driver: driver, Attempt: action.Attempt, MaxAttempts: m.Policy.recoveryLimit(),
 		Trigger: trigger, FailedAt: action.FinishedAt, TerminationReason: action.TerminationReason}
 	m.queueNotification("red", at, &failure, emit)
 }

@@ -12,6 +12,7 @@ import threading
 import time
 import urllib.request
 from playwright.sync_api import sync_playwright
+from process import private_process
 
 
 def main():
@@ -20,7 +21,7 @@ def main():
     p.add_argument('--client',required=True)
     p.add_argument('--out',required=True)
     a=p.parse_args()
-    out=pathlib.Path(a.out).resolve();out.mkdir(parents=True,exist_ok=True)
+    out=pathlib.Path(a.out).absolute();out.mkdir(parents=True,exist_ok=True,mode=0o700)
     counters={'checks':0,'alerts':0}
     class Target(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
@@ -32,14 +33,15 @@ def main():
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     process=None
     try:
-        with tempfile.TemporaryDirectory(prefix='cpra-browser-') as directory:
+        with tempfile.TemporaryDirectory(prefix='cpra-browser-',dir=out) as directory:
             directory=pathlib.Path(directory)
             manifest={'monitors':[{'id':'browser-fixture','name':'Durable browser fixture','pulse_check':{'type':'http','interval':'100ms','timeout':'1s','unhealthy_threshold':1,'config':{'url':'http://127.0.0.1:'+str(server.server_port)}},'codes':{'red':{'notify':'webhook','config':{'url':'http://127.0.0.1:'+str(server.server_port)+'/alert'}}}}]}
             (directory/'monitors.json').write_text(json.dumps(manifest))
             token='local-fixture-'+os.urandom(16).hex()
-            env=dict(os.environ,CPRA_AUTH_TOKEN=token)
+            token_path=directory/'token';token_path.write_text(token);token_path.chmod(0o600)
+            env=private_process(out,state=directory/'state',configuration=directory/'monitors.json',credentials=token_path,logs=out/'controller.log')
             # This port is dedicated to this short local browser scenario.
-            process=subprocess.Popen([str(pathlib.Path(a.binary).resolve()),'-yaml',str(directory/'monitors.json'),'-web.addr','127.0.0.1:18067'],cwd=directory,env=env,stdout=(out/'controller.log').open('wb'),stderr=subprocess.STDOUT)
+            process=subprocess.Popen([str(pathlib.Path(a.binary).resolve()),'-yaml',str(directory/'monitors.json'),'-data-dir',str(directory/'state'),'-web.auth-file',str(token_path),'-web.addr','127.0.0.1:18067'],cwd=directory,env=env,stdout=(out/'controller.log').open('xb'),stderr=subprocess.STDOUT)
             base='http://127.0.0.1:18067'
             def api(path):
                 req=urllib.request.Request(base+path,headers={'Authorization':'Bearer '+token})
@@ -77,7 +79,7 @@ def main():
             if not {e['id'] for e in history['events']} <= {e['id'] for e in records['events']}:raise RuntimeError('API timeline lost observed event identities')
             if any(e['monitor_id']!='browser-fixture' for e in records['events']):raise RuntimeError('API timeline returned another monitor')
             for probe in ('health','ready'):
-                subprocess.run([str(pathlib.Path(a.client).resolve()),'--server',base,'--allow-insecure-http','--request-timeout','5s',probe],check=True,timeout=10,text=True,env=env,stdout=subprocess.DEVNULL)
+                subprocess.run([str(pathlib.Path(a.client).resolve()),'--server',base,'--token-file',str(token_path),'--allow-insecure-http','--request-timeout','5s',probe],check=True,timeout=10,text=True,env=env,stdout=subprocess.DEVNULL)
             report={'status':'pass','browser_errors':errors,'numeric_monitor_id':ident,'stable_monitor_id':'browser-fixture','history_events':len(records['events']),'checks':counters['checks'],'notifications':counters['alerts'],'api_history_ids_retained':True,'cli_probes_pass':True,'history_endpoint':'/api/v1/history'}
             (out/'result.json').write_text(json.dumps(report,indent=2)+'\n')
     finally:

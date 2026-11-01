@@ -1,0 +1,730 @@
+{
+  "version": "1",
+  "codes": {
+    "ca_file_missing": {
+      "message": "The configured CA file does not exist. No target check was performed.",
+      "phases": [
+        "local"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "docker",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": false,
+      "available": false,
+      "details": []
+    },
+    "ca_file_unreadable": {
+      "message": "The configured CA file cannot be read by CPRa. No target check was performed.",
+      "phases": [
+        "local"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "docker",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": false,
+      "available": false,
+      "details": []
+    },
+    "ca_file_invalid": {
+      "message": "The configured CA file must be a regular PEM certificate file of at most 1 MiB. No target check was performed.",
+      "phases": [
+        "local"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "docker",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": false,
+      "available": false,
+      "details": []
+    },
+    "deadline_exceeded": {
+      "message": "The operation did not finish within its deadline.",
+      "phases": [
+        "check"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "docker",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "cancelled": {
+      "message": "The operation was cancelled before a confirmed outcome.",
+      "phases": [
+        "local"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "docker",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": false,
+      "available": false,
+      "details": []
+    },
+    "dns_failed": {
+      "message": "The target name could not be resolved.",
+      "phases": [
+        "resolve"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "tls_failed": {
+      "message": "TLS certificate verification or negotiation failed.",
+      "phases": [
+        "tls"
+      ],
+      "drivers": [
+        "http",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "connection_failed": {
+      "message": "The connection could not be established or completed.",
+      "phases": [
+        "connect",
+        "request",
+        "response"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "unexpected_http_status": {
+      "message": "The health endpoint returned an unexpected HTTP status.",
+      "phases": [
+        "response"
+      ],
+      "drivers": [
+        "http"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": [
+        "httpStatus"
+      ]
+    },
+    "grpc_health_failed": {
+      "message": "The gRPC health endpoint did not report SERVING.",
+      "phases": [
+        "response"
+      ],
+      "drivers": [
+        "grpc"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": [
+        "grpcCode",
+        "grpcStatus"
+      ]
+    },
+    "certificate_expiring": {
+      "message": "The TLS certificate has reached its configured expiry threshold.",
+      "phases": [
+        "tls"
+      ],
+      "drivers": [
+        "tls"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": [
+        "certificateNotAfter",
+        "certificateDaysRemaining"
+      ]
+    },
+    "permission_denied": {
+      "message": "The operation was denied by local access permissions.",
+      "phases": [
+        "local"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "docker",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": false,
+      "available": false,
+      "details": []
+    },
+    "authentication_failed": {
+      "message": "The target rejected the configured credentials.",
+      "phases": [
+        "authentication"
+      ],
+      "drivers": [
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "authorization_failed": {
+      "message": "The target denied the operation for the configured identity.",
+      "phases": [
+        "authorization"
+      ],
+      "drivers": [
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "rejected": {
+      "message": "The provider explicitly rejected the operation.",
+      "phases": [
+        "check"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "docker",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": false,
+      "available": true,
+      "details": []
+    },
+    "job_panicked": {
+      "message": "The job stopped because its implementation panicked.",
+      "phases": [
+        "local"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "docker",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": false,
+      "available": false,
+      "details": []
+    },
+    "operation_failed": {
+      "message": "The operation failed; no safe provider detail is available.",
+      "phases": [
+        "check"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "docker",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": false,
+      "available": true,
+      "details": []
+    },
+    "network.connection_refused": {
+      "message": "The connection was refused. The observation does not establish why.",
+      "phases": [
+        "connect",
+        "request",
+        "response"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "network.connection_reset": {
+      "message": "The connection was reset before the check completed.",
+      "phases": [
+        "connect",
+        "request",
+        "response"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "network.unreachable": {
+      "message": "The network path or host was reported unreachable.",
+      "phases": [
+        "connect",
+        "request",
+        "response"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "network.timeout": {
+      "message": "A network operation did not complete before its deadline.",
+      "phases": [
+        "connect",
+        "request",
+        "response"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "dns.not_found": {
+      "message": "The resolver reported that the requested name or address does not exist.",
+      "phases": [
+        "resolve"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "dns.timeout": {
+      "message": "The name resolution operation timed out.",
+      "phases": [
+        "resolve"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "tls.cert.untrusted": {
+      "message": "The certificate chain could not be verified against the configured trust roots.",
+      "phases": [
+        "tls"
+      ],
+      "drivers": [
+        "http",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "tls.cert.hostname": {
+      "message": "The certificate does not match the configured server name.",
+      "phases": [
+        "tls"
+      ],
+      "drivers": [
+        "http",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "tls.cert.expired": {
+      "message": "The presented certificate has expired.",
+      "phases": [
+        "tls"
+      ],
+      "drivers": [
+        "http",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "tls.cert.not_yet_valid": {
+      "message": "The presented certificate is not yet valid.",
+      "phases": [
+        "tls"
+      ],
+      "drivers": [
+        "http",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "tls.cert.invalid": {
+      "message": "The certificate failed a typed validity check.",
+      "phases": [
+        "tls"
+      ],
+      "drivers": [
+        "http",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "tls.protocol_error": {
+      "message": "TLS negotiation failed before a check result was obtained.",
+      "phases": [
+        "tls"
+      ],
+      "drivers": [
+        "http",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "docker.not_running": {
+      "message": "The inspected container is not running.",
+      "phases": [
+        "response"
+      ],
+      "drivers": [
+        "docker"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "docker.not_found": {
+      "message": "The Docker API reported that the configured container does not exist.",
+      "phases": [
+        "response"
+      ],
+      "drivers": [
+        "docker"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "check.unavailable": {
+      "message": "The check could not obtain an observation because a local dependency was unavailable.",
+      "phases": [
+        "local"
+      ],
+      "drivers": [
+        "http",
+        "tcp",
+        "udp",
+        "dns",
+        "icmp",
+        "grpc",
+        "docker",
+        "tls",
+        "redis",
+        "postgres",
+        "mysql",
+        "mongo",
+        "rabbitmq",
+        "kafka"
+      ],
+      "eligible": false,
+      "available": false,
+      "details": []
+    },
+    "grpc.rpc_failed": {
+      "message": "The gRPC health RPC did not complete successfully.",
+      "phases": [
+        "check"
+      ],
+      "drivers": [
+        "grpc"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": [
+        "grpcCode"
+      ]
+    },
+    "icmp.no_reply": {
+      "message": "No ICMP reply was received within the check budget.",
+      "phases": [
+        "response"
+      ],
+      "drivers": [
+        "icmp"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    },
+    "udp.empty_response": {
+      "message": "The UDP peer returned an empty datagram.",
+      "phases": [
+        "response"
+      ],
+      "drivers": [
+        "udp"
+      ],
+      "eligible": true,
+      "available": true,
+      "details": []
+    }
+  }
+}

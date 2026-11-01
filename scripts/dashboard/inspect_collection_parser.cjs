@@ -10,7 +10,7 @@ require(process.argv[2]);
   if (typeof metadata !== 'string' || Buffer.byteLength(metadata) > 65536) throw new Error('Missing bounded parser build information');
   const information = JSON.parse(metadata);
   const profile = globalThis.cpraCollectionNormalizationProfile;
-  if (typeof profile !== 'string' || profile !== 'cpra.file.base.v3') throw new Error('Missing supported parser normalization profile');
+  if (typeof profile !== 'string' || profile !== 'cpra.file.base.v5') throw new Error('Missing supported parser normalization profile');
   information.NormalizationProfile = profile;
   process.stdout.write(JSON.stringify(information), () => process.exit(0));
 })().catch(() => { process.stderr.write('Parser build inspection failed.\n'); process.exitCode = 1; });

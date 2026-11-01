@@ -314,3 +314,29 @@ func TestRuntimeTargetSummaryDoesNotResolveCredentials(t *testing.T) {
 		t.Fatal("public summary contained credential-derived target")
 	}
 }
+
+func TestManifestFieldSpellingMatchesAllRuntimeDriverTags(t *testing.T) {
+	for key, factory := range runtimeDriverFactories {
+		category, kind, _ := strings.Cut(key, "/")
+		typ := reflect.TypeOf(factory()).Elem()
+		for i := 0; i < typ.NumField(); i++ {
+			field := typ.Field(i)
+			for _, format := range []string{"yaml", "json"} {
+				name := strings.Split(field.Tag.Get(format), ",")[0]
+				if name == "-" {
+					continue
+				}
+				if name == "" {
+					name = field.Name
+					if format == "yaml" {
+						name = strings.ToLower(name)
+					}
+				}
+				raw, _ := json.Marshal(map[string]any{name: nil})
+				if err := api.ValidateManifestDriverFields(category, kind, raw, format == "json"); err != nil {
+					t.Errorf("%s %s %s: %v", key, format, name, err)
+				}
+			}
+		}
+	}
+}

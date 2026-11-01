@@ -176,7 +176,7 @@ func (f *machine) jobTypeCatalogReferenced(id, uid string) bool {
 func operationDigestEncoding(c Command) ([]byte, error) {
 	legacy := legacyOperationCommandDigest(c)
 	if c.Catalog == nil || len(c.Catalog.Record.JobTypeReferences) == 0 {
-		return json.Marshal(legacy)
+		return recoveryRuleOperationDigest(c)
 	}
 	return json.Marshal(struct {
 		Format     string                   `json:"format"`

@@ -16,6 +16,7 @@ type ActionView struct {
 
 func actionView(a persistence.ActionRecord) api.Action {
 	out := api.Action{ID: a.ID, MonitorID: a.MonitorID, IncarnationUID: a.IncarnationID(), IncidentID: a.IncidentID, ExecutionID: a.ID, ExecutionRevision: a.Revision, State: string(a.State), Kind: a.Kind, Outcome: a.Outcome, ReviewRevision: a.ReviewRevision, Held: a.Held, ExecutorFenced: a.ExecutorFenced, ReceiptID: a.OperationID}
+	out.RecoverySelection = a.Rule.Public()
 	out.TerminationReason, out.Resolution = a.TerminationReason, resolutionView(a.Resolution)
 	if a.ExecutionBudget > 0 {
 		out.ExecutionBudget = a.ExecutionBudget.String()

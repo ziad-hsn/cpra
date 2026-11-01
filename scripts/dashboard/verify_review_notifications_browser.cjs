@@ -245,8 +245,9 @@ function check(value, message) { if (!value) throw new Error(message); }
     check(!/Unexpected Application Error|TypeError:|\bat \w+ \(/.test(await page.locator('body').innerText()), 'route failure exposed stack details');
     await save('offline-route.png');
     await context.setOffline(false);
-    await page.getByRole('button', { name: 'Reload dashboard', exact: true }).click();
-    await signIn();
+    await page.getByRole('button', { name: 'Retry page', exact: true }).click();
+    await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
+    check(await page.getByRole('button', { name: 'Sign out', exact: true }).count() === 1, 'route retry lost the current session');
     await navigate('/missing-review-fixture-route');
     await page.getByRole('heading', { name: 'Page not found', exact: true }).waitFor();
     check(writes.length === beforeOfflineWrites, 'reconnection retried a mutation');

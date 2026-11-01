@@ -18,6 +18,10 @@ func newLocalAuthCommand() *cobra.Command {
 		if action == "list" || action == "rotate-read-token" {
 			command.Use, command.Args = action, cobra.NoArgs
 		}
+		if action == "reprovision" {
+			command.Use, command.Args = action+" [PRINCIPAL]", cobra.MaximumNArgs(1)
+			command.Flags().StringVar(&request.Mode, "mode", "management", "restored access mode: management (named principal) or observation (fresh shared read token)")
+		}
 		command.Flags().StringVar(&request.DataDirectory, "data-dir", "", "required absolute path to the stopped state directory")
 		if action != "list" && action != "revoke" {
 			command.Flags().StringVar(&request.TokenOutput, "token-output", "", "required absent absolute file outside state; receives the bearer once with protected permissions")
@@ -29,7 +33,12 @@ func newLocalAuthCommand() *cobra.Command {
 			command.Flags().StringVar(&request.Role, "role", "", "required role: reader or operator")
 		}
 		command.RunE = func(cmd *cobra.Command, args []string) error {
-			if action != "list" && action != "rotate-read-token" {
+			if action == "reprovision" {
+				if request.Mode == "observation" && len(args) != 0 || request.Mode != "observation" && len(args) != 1 {
+					return errors.New("management reprovisioning requires a principal; observation reprovisioning accepts none")
+				}
+			}
+			if len(args) == 1 {
 				request.PrincipalID = args[0]
 			}
 			if cmd.Flags().Changed("expires-at") {
@@ -73,6 +82,6 @@ func localAuthDescription(action string) string {
 	case "revoke":
 		return "Revoke one principal in the authoritative durable policy"
 	default:
-		return "Provision a restored store's current epoch with one new principal, replacing all restored grants"
+		return "Provision a restored store's current epoch in the explicitly selected access mode, replacing all restored grants"
 	}
 }

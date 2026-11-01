@@ -290,6 +290,12 @@
     "AutoIgnore",
     "FieldError",
     "MonitorAvailability",
-    "NotificationCondition"
+    "NotificationCondition",
+    "RecoveryRule",
+    "FailureMatch",
+    "RecoveryDecision",
+    "RecoverySelection",
+    "MonitorObservation",
+    "RecoveryAdmission"
   ]
 }

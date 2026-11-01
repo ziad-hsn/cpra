@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ziad-hsn/cpra/sdk/go/api"
+	"gopkg.in/yaml.v3"
 )
 
 func TestSemanticErrorOriginalFieldPositions(t *testing.T) {
@@ -218,6 +219,42 @@ func TestYAMLDurationAliases(t *testing.T) {
 		}
 		if err := <-failures; err != nil || count != 1 {
 			t.Fatalf("same-entry duration aliases rejected: count=%d error=%v", count, err)
+		}
+	}
+}
+
+func TestRuleTargetDiagnosticsKeepSourceSpellingAndCanonicalCause(t *testing.T) {
+	for _, jsonInput := range []bool{false, true} {
+		root := t.TempDir()
+		path := filepath.Join(root, "monitor.yaml")
+		raw := []byte("intervention:\n  rules:\n    - target:\n        operation_timeout: -1s\n")
+		if jsonInput {
+			raw = []byte(`{"intervention":{"rules":[{"target":{"operation_timeout":"-1s"}}]}}`)
+		}
+		if err := os.WriteFile(path, raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		canonical := "intervention.rules[0].driver.config.operationTimeout"
+		cause := api.InvalidField(canonical, "positiveDuration")
+		var err error
+		if jsonInput {
+			err = jsonSourceError(t.Context(), path, 1, raw, int64(len(raw)), cause)
+		} else {
+			var node yaml.Node
+			if e := yaml.Unmarshal(raw, &node); e != nil {
+				t.Fatal(e)
+			}
+			err = yamlSourceError(t.Context(), path, 1, &node, cause)
+		}
+		if !strings.Contains(err.Error(), "intervention.rules[0].target.operation_timeout") || strings.Contains(err.Error(), "operationTimeout") || strings.Contains(err.Error(), "-1s") {
+			t.Fatal("unsafe or canonical-only source presentation", err)
+		}
+		detail, ok := api.ValidationFieldError(err)
+		if !ok || detail.Field != canonical {
+			t.Fatal("typed cause changed", detail)
+		}
+		if !jsonInput && !strings.Contains(err.Error(), "line 4 column 28") {
+			t.Fatal("rule target lost position", err)
 		}
 	}
 }

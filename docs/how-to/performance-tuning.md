@@ -56,8 +56,12 @@ goroutines after a capacity reduction. A field unavailable on an older server is
 not a measured zero.
 
 The check queue preserves driver allowances and fair destination flows.
-Notification and intervention queues serialize a private destination while
-allowing other destinations to progress. Destination keys never appear in
+Intervention queues serialize a private destination. Notification queues permit
+independent sequences at the same destination: generic webhooks default to four
+concurrent invocations, and other drivers default to one. Opening, update and
+resolution for the same sequence remain ordered; historical keys that refer to
+the same provider incident also share that ordering. Provider pacing and global
+worker limits can impose a lower ceiling. Destination keys never appear in
 observations or metric labels. No worker can be forcibly preempted; a reduced
 limit waits for existing work to drain. A budget too small to run two operations
 cannot provide simultaneous progress for two destinations.
@@ -70,6 +74,27 @@ counts. `cpra_driver_oldest_pending_seconds` and
 `cpra_driver_oldest_inflight_seconds` are durations in seconds and are absent
 when the corresponding work is absent. Worker gauges separate requested,
 reserved, running, executing, draining and pending-submission counts.
+
+`cpra_driver_destination_concurrency` is the configured destination ceiling.
+`cpra_driver_worker_headroom` is the allowance before pacing, ordering and durable
+admission; it is not a count of notifications executable now.
+`cpra_driver_rate_deferred_total` counts admitted copies observed waiting for
+pacing, once per copy, rather than counting dispatcher polls. The queue gauge
+`cpra_queue_awaiting_reconciliation` counts completed notification dispatches
+that retain reservations until owner reconciliation. These metrics
+never include destination, monitor, credential or private limiter identifiers.
+
+`cpra_action_cancellations_total` counts committed cancellations, and
+`cpra_action_definite_rejections_total` counts permanent proven-no-effect failures.
+`cpra_action_exhaustions_total` distinguishes `attempt_limit` and
+`execution_deadline`. Their labels are limited to the `code` and `intervention`
+pipelines and these fixed reasons. They count new transitions since the store
+opened, exclude historical replay, and reset on restart. They are sampled
+counters, not a transactionally consistent snapshot of the retained action ledger.
+An expired queued action can count as both canceled and deadline-exhausted; do not
+sum these families as disjoint outcomes. Intermediate safe retries and unknown
+effects do not count as exhaustion. Use the action and condition views for the
+retained outcome, review requirements and original deadline.
 
 ## HTTP connection reuse
 

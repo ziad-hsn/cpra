@@ -9,6 +9,17 @@ import (
 	"github.com/ziad-hsn/cpra/sdk/go/api"
 )
 
+// ValidateCompiledResource checks the pure driver/platform capability contract.
+// Callers can use it for offline input without storage, credentials or clients.
+func (o CatalogOptions) ValidateCompiledResource(resource api.Resource) error {
+	return visitDrivers(&resource, func(category string, driver *api.DriverConfig) error {
+		if err := o.validateDriverType(category, driver.Type); err != nil {
+			return api.InvalidField("type", "unsupportedDriver")
+		}
+		return nil
+	})
+}
+
 func (o CatalogOptions) validateDriver(category string, driver api.DriverConfig) error {
 	if handled, err := o.validateDriverExtension(category, driver); handled {
 		return err

@@ -110,10 +110,10 @@ func visitDrivers(resource *api.Resource, visit func(string, *api.DriverConfig) 
 		if err := visit("check", &spec.Check.Driver); err != nil {
 			return api.PrefixValidationError("spec.check.driver", err)
 		}
-		if spec.Recovery != nil {
-			if err := visit("recovery", &spec.Recovery.Driver); err != nil {
-				return api.PrefixValidationError("spec.recovery.driver", err)
-			}
+		if err := api.VisitRecoveryDrivers(spec.Recovery, func(field string, driver *api.DriverConfig) error {
+			return api.PrefixValidationError("spec.recovery."+field, visit("recovery", driver))
+		}); err != nil {
+			return err
 		}
 		if spec.Notifications != nil {
 			for color, rule := range *spec.Notifications {

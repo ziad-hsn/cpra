@@ -34,7 +34,15 @@ func (c *Catalog) EvaluateWorkerMaintenance(ctx context.Context, in persistence.
 		}
 	}
 	if !matched {
-		return out, nil
+		m, found, err := c.store.GetContext(ctx, in.MonitorID)
+		if err != nil {
+			return out, err
+		}
+		a, actionFound := m.Actions[in.ActionID]
+		if !found || !actionFound || a.Resolution == nil && a.ReviewBinding == "" || a.Revision != in.MonitorRevision || m.CatalogRevision != record.Revision || !m.ActionConfigurationCurrent(a) {
+			return out, nil
+		}
+		out.CurrentMonitorRevision = record.Revision
 	}
 	resource, err := c.open(ctx, record)
 	if err != nil {

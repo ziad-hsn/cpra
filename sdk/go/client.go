@@ -386,6 +386,11 @@ type ListOptions struct {
 	Limit     int
 	Selector  string
 	MonitorID string
+	// Incident filters apply to Incidents.List/Iterate. Omitted filters include
+	// all latest episodes; triage orders lifecycle, attention, age, then ID.
+	IncidentState           string
+	Acknowledged, Dismissed *bool
+	IncidentOrder           string
 }
 
 func (o ListOptions) validate() error {
@@ -407,22 +412,29 @@ func ptr[T any](v T) *T { return &v }
 
 // Iterator retains one page and fetches the next page only when exhausted.
 type Iterator[T any] struct {
-	fetch         func(context.Context, string) ([]T, string, error)
-	items         []T
-	next          string
-	index         int
-	started, done bool
-	value         T
-	err           error
+	fetch           func(context.Context, string) ([]T, string, error)
+	items           []T
+	next            string
+	index           int
+	started, done   bool
+	allowEmptyPages bool
+	value           T
+	err             error
 }
 
-// Next advances to the next item, fetching at most one page as needed. It returns
-// false at the end or after an error; inspect Err to distinguish those cases.
+// Next advances to the next item. Incident filters may scan bounded pages with
+// no matches; at most 1,024 advancing empty pages are followed in one call.
+// It returns false at the end or after an error; inspect Err to distinguish them.
 func (i *Iterator[T]) Next(ctx context.Context) bool {
 	if i.err != nil || i.done {
 		return false
 	}
+	emptyPages := 0
 	for i.index >= len(i.items) {
+		if err := ctx.Err(); err != nil {
+			i.err = err
+			return false
+		}
 		if i.started && i.next == "" {
 			i.done = true
 			return false
@@ -442,8 +454,11 @@ func (i *Iterator[T]) Next(ctx context.Context) bool {
 		i.index = 0
 		i.started = true
 		if len(items) == 0 && next != "" {
-			i.err = errors.New("server returned an empty nonterminal page")
-			return false
+			emptyPages++
+			if !i.allowEmptyPages || emptyPages >= 1024 {
+				i.err = errors.New("empty pagination limit exceeded; use page methods to continue sparse filtering")
+				return false
+			}
 		}
 	}
 	i.value = i.items[i.index]

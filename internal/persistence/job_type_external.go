@@ -9,7 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"math"
+	"slices"
 	"sort"
 	"time"
 	"unicode"
@@ -26,7 +28,11 @@ const DeliveryWorkerFormatVersion = 41
 const LifecycleWorkerFormatVersion = 43
 const ActionWorkerFormatVersion = 45
 const WorkerNotificationConditionFormatVersion = 47
-const LatestFormatVersion = WorkerNotificationConditionFormatVersion
+const WorkerRecoveryRulesFormatVersion = 49
+const WorkerDispatchFormatVersion = 51
+const LatestFormatVersion = WorkerDispatchFormatVersion
+const workerDispatchSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-51\n"
+const workerRecoveryRulesSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-49\n"
 const workerNotificationConditionSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-47\n"
 const actionWorkerSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-45\n"
 const lifecycleWorkerSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-43\n"
@@ -40,6 +46,12 @@ const jobTypeSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-15\n"
 // Format 31 is readable without externaljobs. Combining it with any optional
 // state uses a distinct format so a default binary cannot discard worker data.
 func joinStorageFormat(a, b int) int {
+	if max(a, b) == DispatchFormatVersion && (externalStorageFormat(a) || externalStorageFormat(b)) {
+		return WorkerDispatchFormatVersion
+	}
+	if max(a, b) == RecoveryRulesFormatVersion && (externalStorageFormat(a) || externalStorageFormat(b)) {
+		return WorkerRecoveryRulesFormatVersion
+	}
 	if max(a, b) == NotificationConditionFormatVersion && (externalStorageFormat(a) || externalStorageFormat(b)) {
 		return WorkerNotificationConditionFormatVersion
 	}
@@ -126,6 +138,7 @@ type resultExtensions struct {
 // selectors. Parameters, schemas, display metadata and provider data stay in
 // Record.Payload. Executions must eventually read Versions, never Current.
 type JobTypeVersion struct {
+	FailureCodes    []string      `json:"failure_codes,omitempty"`
 	Record          CatalogRecord `json:"record"`
 	Version         string        `json:"version"`
 	Category        string        `json:"category"`
@@ -134,7 +147,11 @@ type JobTypeVersion struct {
 	SchemaProfile   string        `json:"schema_profile"`
 }
 
-func (v JobTypeVersion) Clone() JobTypeVersion { v.Record = v.Record.Clone(); return v }
+func (v JobTypeVersion) Clone() JobTypeVersion {
+	v.Record = v.Record.Clone()
+	v.FailureCodes = slices.Clone(v.FailureCodes)
+	return v
+}
 
 // JobTypeState retains all admitted version names, including across deletion
 // and recreation. Current may have newer display metadata for the same version.
@@ -190,7 +207,7 @@ func (v JobTypeVersion) validate() error {
 	r := v.Record
 	if r.validate() != nil || r.Key.Kind != "JobType" || r.Purpose != "job-type" ||
 		len(r.References) != 0 || r.DependentsVersion != 0 || r.Generation > math.MaxInt64 ||
-		!jobTypeSelector(v.Version) || !jobTypeSelector(v.Handler) || v.ProtocolVersion != "1" || v.SchemaProfile != "cpra.schema.v1" ||
+		!jobTypeSelector(v.Version) || !jobTypeSelector(v.Handler) || api.ValidateJobTypeFailures(api.JobTypeSpec{Kind: v.Category, ProtocolVersion: v.ProtocolVersion, FailureCodes: v.FailureCodes}) != nil || v.SchemaProfile != "cpra.schema.v1" ||
 		r.CreatedAt.Year() < 1 || r.CreatedAt.Year() > 9999 || r.UpdatedAt.Year() < 1 || r.UpdatedAt.Year() > 9999 {
 		return ErrJobTypeInvalid
 	}
@@ -421,6 +438,29 @@ func hasCommandExtensions(c Command) bool {
 	return c.WorkerSchedule != nil || c.WorkerExpire != nil || c.WorkerCheckAllocate != nil || c.WorkerCheckRetire != nil || c.WorkerRequeue != nil || c.WorkerObservation != nil || c.WorkerFinalize != nil || c.WorkerEvidence != nil || c.WorkerHeartbeat != nil || c.WorkerResult != nil || c.WorkerStart != nil || c.WorkerExecution != nil || c.JobType != nil || c.JobTypeAllocation != nil || c.WorkerPolicy != nil || c.WorkerSession != nil
 }
 func commandExtensionMinimumFormat(c Command) int {
+	if c.WorkerStart != nil && c.WorkerStart.Maintenance != nil && c.WorkerStart.Maintenance.CurrentMonitorRevision != "" || c.WorkerResult != nil && c.WorkerResult.Maintenance != nil && c.WorkerResult.Maintenance.CurrentMonitorRevision != "" || c.WorkerHeartbeat != nil && c.WorkerHeartbeat.Maintenance != nil && c.WorkerHeartbeat.Maintenance.CurrentMonitorRevision != "" {
+		return WorkerDispatchFormatVersion
+	}
+	if c.WorkerSession != nil {
+		for _, d := range c.WorkerSession.Maintenance {
+			if d.CurrentMonitorRevision != "" {
+				return WorkerDispatchFormatVersion
+			}
+		}
+	}
+	if c.WorkerExecution != nil && c.WorkerExecution.Intent.minimumFormat() == WorkerDispatchFormatVersion {
+		return WorkerDispatchFormatVersion
+	}
+	if c.JobType != nil && c.JobType.Value.ProtocolVersion == "2" || c.WorkerResult != nil && c.WorkerResult.Input.Failure != (FailureDiagnostic{}) {
+		return WorkerRecoveryRulesFormatVersion
+	}
+	if c.WorkerSession != nil {
+		for _, capability := range c.WorkerSession.Request.Capabilities {
+			if capability.ProtocolVersion != "" {
+				return WorkerRecoveryRulesFormatVersion
+			}
+		}
+	}
 	if c.WorkerExecution != nil && c.WorkerExecution.Intent.minimumFormat() == WorkerNotificationConditionFormatVersion {
 		return WorkerNotificationConditionFormatVersion
 	}
@@ -495,6 +535,12 @@ func commandExtensionMinimumFormat(c Command) int {
 	return FormatVersion
 }
 func externalStorageFormat(version int) bool {
+	if version == WorkerDispatchFormatVersion {
+		return true
+	}
+	if version == WorkerRecoveryRulesFormatVersion {
+		return true
+	}
 	if version == WorkerNotificationConditionFormatVersion {
 		return true
 	}
@@ -521,11 +567,17 @@ func externalStorageFormat(version int) bool {
 func commandExtensionWriteFormat(c Command) int {
 	version := commandExtensionMinimumFormat(c)
 	if c.Kind == "worker_result" || c.Kind == "worker_start" || c.Kind == "worker_poll" || c.Kind == "worker_heartbeat" {
-		return joinStorageFormat(version, NotificationConditionFormatVersion)
+		return joinStorageFormat(version, DispatchFormatVersion)
 	}
 	return version
 }
 func externalSnapshotMagic(version int) string {
+	if version == WorkerDispatchFormatVersion {
+		return workerDispatchSnapshotMagic
+	}
+	if version == WorkerRecoveryRulesFormatVersion {
+		return workerRecoveryRulesSnapshotMagic
+	}
 	if version == WorkerNotificationConditionFormatVersion {
 		return workerNotificationConditionSnapshotMagic
 	}
@@ -604,6 +656,12 @@ func externalSnapshotMagic(version int) string {
 	return ""
 }
 func externalSnapshotVersion(prefix []byte) (int, int) {
+	if bytes.HasPrefix(prefix, []byte(workerDispatchSnapshotMagic)) {
+		return WorkerDispatchFormatVersion, len(workerDispatchSnapshotMagic)
+	}
+	if bytes.HasPrefix(prefix, []byte(workerRecoveryRulesSnapshotMagic)) {
+		return WorkerRecoveryRulesFormatVersion, len(workerRecoveryRulesSnapshotMagic)
+	}
 	if bytes.HasPrefix(prefix, []byte(workerNotificationConditionSnapshotMagic)) {
 		return WorkerNotificationConditionFormatVersion, len(workerNotificationConditionSnapshotMagic)
 	}
@@ -740,11 +798,11 @@ func jobTypeStateCost(s JobTypeState) (int64, error) {
 }
 
 func sameJobTypeSelectors(a, b JobTypeVersion) bool {
-	return a.Version == b.Version && a.Category == b.Category && a.Handler == b.Handler && a.ProtocolVersion == b.ProtocolVersion && a.SchemaProfile == b.SchemaProfile
+	return a.Version == b.Version && a.Category == b.Category && a.Handler == b.Handler && a.ProtocolVersion == b.ProtocolVersion && slices.Equal(a.FailureCodes, b.FailureCodes) && a.SchemaProfile == b.SchemaProfile
 }
 
 func validateImageExtensions(i image) error {
-	if i.Version == AgentActionFormatVersion || i.Version == RecoveryNotificationFormatVersion || i.Version == AgentObservationFormatVersion || i.Version == NotificationFormatVersion || i.Version == DeliveryFormatVersion || i.Version == LifecycleFormatVersion || i.Version == ActionFormatVersion || i.Version == NotificationConditionFormatVersion {
+	if i.Version == AgentActionFormatVersion || i.Version == RecoveryNotificationFormatVersion || i.Version == AgentObservationFormatVersion || i.Version == NotificationFormatVersion || i.Version == DeliveryFormatVersion || i.Version == LifecycleFormatVersion || i.Version == ActionFormatVersion || i.Version == NotificationConditionFormatVersion || i.Version == RecoveryRulesFormatVersion || i.Version == DispatchFormatVersion {
 		if i.imageExtensions != (imageExtensions{}) {
 			return ErrJobTypeInvalid
 		}
@@ -799,7 +857,7 @@ func validateImageExtensions(i image) error {
 			return ErrJobTypeInvalid
 		}
 		for version, value := range state.Versions {
-			if version != value.Version || value.validate() != nil || value.Record.Removed || value.Record.Key != current.Record.Key || value.Category != current.Category || value.Record.CommittedIndex == 0 || value.Record.CommittedIndex > current.Record.CommittedIndex || value.Record.UpdatedAt.After(current.Record.UpdatedAt) {
+			if version != value.Version || value.ProtocolVersion == "2" && i.Version != WorkerRecoveryRulesFormatVersion && i.Version != WorkerDispatchFormatVersion || value.validate() != nil || value.Record.Removed || value.Record.Key != current.Record.Key || value.Category != current.Category || value.Record.CommittedIndex == 0 || value.Record.CommittedIndex > current.Record.CommittedIndex || value.Record.UpdatedAt.After(current.Record.UpdatedAt) {
 				return ErrJobTypeInvalid
 			}
 		}
@@ -819,6 +877,15 @@ func validateImageExtensions(i image) error {
 }
 
 func jobTypeCommandDigest(c JobTypeCommand, at time.Time) string {
+	if c.Value.ProtocolVersion != "1" || len(c.Value.FailureCodes) != 0 {
+		raw, version, _ := jobTypeDigestEncoding(c)
+		data, _ := json.Marshal(struct {
+			Command json.RawMessage `json:"command"`
+			At      time.Time       `json:"at"`
+		}{raw, at.UTC()})
+		h := sha256.Sum256(append([]byte("cpra-job-type-command-"+version+"\x00"), data...))
+		return hex.EncodeToString(h[:])
+	}
 	data, _ := json.Marshal(struct {
 		Command jobTypeCommandDigestV1 `json:"command"`
 		At      time.Time              `json:"at"`
@@ -977,7 +1044,10 @@ func (f *machine) applyJobType(c JobTypeCommand, at time.Time, index uint64, dig
 	if c.OperationID != "" {
 		version = JobTypeOperationFormatVersion
 	}
-	f.image.Version = max(f.image.Version, version)
+	if value.ProtocolVersion == "2" {
+		version = WorkerRecoveryRulesFormatVersion
+	}
+	f.image.Version = joinStorageFormat(f.image.Version, version)
 	copy := next.Clone()
 	return Result{Allowed: true, resultExtensions: resultExtensions{JobType: &copy}}
 }

@@ -2,12 +2,13 @@ package persistence
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"testing"
 	"time"
 )
 
-func TestInterventionDeadlineSurvivesRestart(t *testing.T) {
+func TestHistoricalInterventionDeadlineSurvivesUpgradeRestart(t *testing.T) {
 	for _, expired := range []bool{false, true} {
 		t.Run(map[bool]string{false: "fresh", true: "expired"}[expired], func(t *testing.T) {
 			s := openCatalogMemory(t)
@@ -15,8 +16,20 @@ func TestInterventionDeadlineSurvivesRestart(t *testing.T) {
 			config.Policy = lifecyclePolicy()
 			config.Policy.Intervention, config.Policy.RecoveryTimeout = true, time.Minute
 			at := policyTime()
-			submit(t, s, Command{Kind: "configure", MonitorID: config.ID, Revision: config.Revision, Config: &config, At: at})
-			m := *submit(t, s, Command{Kind: "pulse", MonitorID: config.ID, Revision: config.Revision, Generation: 1, Outcome: "failure", At: at})[0].Monitor
+			oldApply := func(c Command) Result {
+				t.Helper()
+				raw, err := json.Marshal(envelope{Version: RecoveryRulesFormatVersion, Commands: []Command{c}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				result, err := s.apply(raw)
+				if err != nil || len(result) != 1 || result[0].Err != nil {
+					t.Fatal("historical command", err)
+				}
+				return result[0]
+			}
+			oldApply(Command{Kind: "configure", MonitorID: config.ID, Revision: config.Revision, Config: &config, At: at})
+			m := *oldApply(Command{Kind: "pulse", MonitorID: config.ID, Revision: config.Revision, Generation: 1, Outcome: "failure", At: at}).Monitor
 			a := interventionAction(t, m)
 			if a.QueuedAt != at || a.Deadline != at.Add(time.Minute) {
 				t.Fatal("queue did not freeze the configured budget")

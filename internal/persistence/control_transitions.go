@@ -107,6 +107,7 @@ func (f *machine) applyControl(id string, c ControlCommand, at time.Time, index 
 	}
 	if actionStorageFormat(version) {
 		m.upgradeActions(at, emit)
+		m.upgradeDispatch(version)
 		f.image.Version = joinStorageFormat(f.image.Version, version)
 	}
 	switch c.Action {
@@ -134,6 +135,9 @@ func (f *machine) applyControl(id string, c ControlCommand, at time.Time, index 
 		m.IncidentRevision = c.Revision
 	} else {
 		m.ControlRevision = c.Revision
+	}
+	if recoveryRulesStorageFormat(version) && subject != "incident" {
+		m.resetRuleQualification("control_changed")
 	}
 	for _, actionID := range sortedActions(m.Actions) {
 		a := m.Actions[actionID]

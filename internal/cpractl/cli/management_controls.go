@@ -22,12 +22,23 @@ func managementIncidentType(name string) bool {
 
 func addManagementIncidentReads(get *cobra.Command, o *options) {
 	list := cpra.ListOptions{Limit: 100}
+	var acknowledged, dismissed bool
 	command := &cobra.Command{Use: "incidents [incident-id]", Aliases: []string{"incident", "inc", "incident-records", "incident-record"}, Short: "Read v2 incident attention and its exact control revision", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		if cmd.Flags().Changed("acknowledged") {
+			list.Acknowledged = &acknowledged
+		}
+		if cmd.Flags().Changed("dismissed") {
+			list.Dismissed = &dismissed
+		}
 		return runManagementIncidentGet(cmd, o, append([]string{"incident-records"}, args...), false, list)
 	}}
 	command.Flags().IntVar(&list.Limit, "limit", 100, "page size (1..500)")
 	command.Flags().StringVar(&list.Cursor, "cursor", "", "continue the original incident page")
 	command.Flags().StringVar(&list.MonitorID, "monitor-id", "", "select the latest retained incident for one exact stable monitor ID")
+	command.Flags().StringVar(&list.IncidentState, "state", "", "filter latest episodes: open, pending or closed")
+	command.Flags().StringVar(&list.IncidentOrder, "order", "", "triage (default) or id; repeat the original selection with --cursor")
+	command.Flags().BoolVar(&acknowledged, "acknowledged", false, "filter acknowledged=true or acknowledged=false; omission includes both")
+	command.Flags().BoolVar(&dismissed, "dismissed", false, "filter dismissed=true or dismissed=false; omission includes both")
 	get.AddCommand(command)
 }
 
@@ -42,7 +53,7 @@ func runManagementIncidentGet(cmd *cobra.Command, o *options, args []string, des
 	if list.Limit < 1 || list.Limit > 500 {
 		return errors.New("page limit must be between 1 and 500")
 	}
-	if list.Selector != "" || (id != "" && (list.Cursor != "" || list.MonitorID != "")) {
+	if list.Selector != "" || (id != "" && (list.Cursor != "" || list.MonitorID != "" || list.IncidentState != "" || list.IncidentOrder != "" || list.Acknowledged != nil || list.Dismissed != nil)) {
 		return errors.New("incident reads require one exact incident ID or bounded paging with an optional monitor ID")
 	}
 	if list.MonitorID != "" {

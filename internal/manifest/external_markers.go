@@ -2,8 +2,16 @@
 
 package manifest
 
+import (
+	"github.com/ziad-hsn/cpra/sdk/go/api"
+	"time"
+)
+
 // ExternalPulseConfig carries only a binding key. It is not an executable job.
-type ExternalPulseConfig struct{ Key ExternalRuntimeKey }
+type ExternalPulseConfig struct {
+	Key             ExternalRuntimeKey
+	FailureContract *api.ExternalFailureContract `json:"-"`
+}
 
 func (*ExternalPulseConfig) isPulseConfigs() {}
 func (c *ExternalPulseConfig) Copy() PulseConfig {
@@ -11,11 +19,19 @@ func (c *ExternalPulseConfig) Copy() PulseConfig {
 		return (*ExternalPulseConfig)(nil)
 	}
 	out := *c
+	if c.FailureContract != nil {
+		contract := *c.FailureContract
+		contract.Codes = append([]string(nil), contract.Codes...)
+		out.FailureContract = &contract
+	}
 	return &out
 }
 
 // ExternalInterventionConfig carries a recovery slot's binding key.
-type ExternalInterventionConfig struct{ Key ExternalRuntimeKey }
+type ExternalInterventionConfig struct {
+	Key    ExternalRuntimeKey
+	Budget time.Duration `json:"-"`
+}
 
 func (*ExternalInterventionConfig) GetTargetType() string { return "external" }
 func (c *ExternalInterventionConfig) Copy() InterventionTarget {

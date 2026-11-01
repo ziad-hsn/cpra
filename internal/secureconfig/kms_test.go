@@ -284,3 +284,48 @@ func TestKMSBoundsErrorsAndCancellation(t *testing.T) {
 		t.Fatal("expired call reached backend")
 	}
 }
+
+func TestKMSCancellationPrecedesIncompleteResponse(t *testing.T) {
+	for _, operation := range []string{"DescribeKey", "Encrypt", "Decrypt"} {
+		t.Run(operation, func(t *testing.T) {
+			_, config := newKMSFixture(t, nil)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			base := config.HTTPClient.(*http.Client).Transport
+			var incompleteRequests atomic.Int64
+			config.HTTPClient = &http.Client{Transport: testRoundTripper(func(request *http.Request) (*http.Response, error) {
+				if request.Header.Get("X-Amz-Target") != "TrentService."+operation {
+					return base.RoundTrip(request)
+				}
+				incompleteRequests.Add(1)
+				cancel()
+				<-request.Context().Done()
+				// A caller-owned transport can return an empty success response
+				// as cancellation becomes observable. Exercise the real SDK decoder.
+				return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: http.NoBody}, nil
+			})}
+			w, err := NewKMSWrapper(ctx, config, KMSOptions{KeyARN: fixtureKMSARN})
+			if operation != "DescribeKey" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(w.CloseIdleConnections)
+				var value []byte
+				if operation == "Encrypt" {
+					value, err = w.Wrap(ctx, bytes.Repeat([]byte{19}, 32), nil)
+				} else {
+					value, err = w.Unwrap(ctx, []byte("fixture-ciphertext"), nil)
+				}
+				if value != nil {
+					t.Fatal("canceled operation returned key material")
+				}
+			}
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("cancellation was hidden by incomplete response: %v", err)
+			}
+			if incompleteRequests.Load() != 1 {
+				t.Fatal("canceled operation was retried")
+			}
+		})
+	}
+}

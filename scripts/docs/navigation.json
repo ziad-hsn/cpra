@@ -48,6 +48,9 @@
         "Check execution and admission": "check-execution.md"
       },
       {
+        "Error-dependent intervention rules": "intervention-rules.md"
+      },
+      {
         "Encrypted collection persistence": "collection-persistence.md"
       },
       {

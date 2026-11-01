@@ -61,18 +61,24 @@ func observationPage(w io.Writer, available bool, cursor string) error {
 	}
 	return nil
 }
+func optionalObservedCount(value *int64) string {
+	if value == nil {
+		return "unavailable"
+	}
+	return fmt.Sprint(*value)
+}
 func writeQueues(p *printer, page api.QueueList) error {
 	return p.render(page, func(w io.Writer) error {
 		headers := []string{"NAME", "DEPTH", "CAPACITY", "ENQUEUED/S", "DEQUEUED/S", "AVERAGE WAIT MS", "DROPS"}
 		if p.wide() {
-			headers = append(headers, "COMPLETED/S", "MAXIMUM WAIT MS", "SATURATED", "LIMIT REASON")
+			headers = append(headers, "COMPLETED/S", "MAXIMUM WAIT MS", "SATURATED", "LIMIT REASON", "AWAITING RECONCILIATION")
 		}
 		rows := make([][]string, 0, len(page.Items))
 		for _, q := range page.Items {
 			a := page.Available && q.Available
 			row := []string{managementDisplay(q.Name), observedCount(a, q.Depth), observedCount(a, q.Capacity), observedNumber(a && q.RatesAvailable, q.EnqueuedPerSecond), observedNumber(a && q.RatesAvailable, q.DequeuedPerSecond), observedMeasurement(a, q.AverageWait), observedCount(a, q.Drops)}
 			if p.wide() {
-				row = append(row, observedNumber(a && q.CompletedRateAvailable, q.CompletedPerSecond), observedMeasurement(a, q.MaximumWait), observedBool(a, q.Saturated), observedText(a, q.LimitReason))
+				row = append(row, observedNumber(a && q.CompletedRateAvailable, q.CompletedPerSecond), observedMeasurement(a, q.MaximumWait), observedBool(a, q.Saturated), observedText(a, q.LimitReason), optionalObservedCount(q.AwaitingReconciliation))
 			}
 			rows = append(rows, row)
 		}
@@ -86,11 +92,11 @@ func writeQueues(p *printer, page api.QueueList) error {
 					continue
 				}
 				for _, d := range q.Drivers {
-					drivers = append(drivers, []string{managementDisplay(q.Name), managementDisplay(d.Driver), fmt.Sprint(d.Pending), fmt.Sprint(d.Active), fmt.Sprint(d.ConcurrencyLimit), observedCount(d.ReservationAvailable, d.RequestedCapacity), observedCount(d.ReservationAvailable, d.ReservedCapacity), measurement(d.OldestPendingMS), measurement(d.OldestActiveMS), fmt.Sprint(d.Rejections), fmt.Sprint(d.Timeouts), managementDisplay(d.Condition)})
+					drivers = append(drivers, []string{managementDisplay(q.Name), managementDisplay(d.Driver), fmt.Sprint(d.Pending), fmt.Sprint(d.Active), fmt.Sprint(d.ConcurrencyLimit), optionalObservedCount(d.DestinationConcurrency), optionalObservedCount(d.WorkerHeadroom), optionalObservedCount(d.RateDeferredTotal), observedCount(d.ReservationAvailable, d.RequestedCapacity), observedCount(d.ReservationAvailable, d.ReservedCapacity), measurement(d.OldestPendingMS), measurement(d.OldestActiveMS), fmt.Sprint(d.Rejections), fmt.Sprint(d.Timeouts), managementDisplay(d.Condition)})
 				}
 			}
 			if len(drivers) > 0 {
-				if err := table(w, []string{"QUEUE", "DRIVER", "PENDING", "IN FLIGHT", "CONCURRENCY", "REQUESTED RESERVATION", "SUPPLIED RESERVATION", "OLDEST PENDING MS", "OLDEST ACTIVE MS", "REJECTED", "TIMEOUTS", "CONDITION"}, drivers); err != nil {
+				if err := table(w, []string{"QUEUE", "DRIVER", "PENDING", "IN FLIGHT", "CONCURRENCY", "DESTINATION CEILING", "WORKER HEADROOM", "RATE DEFERRED TOTAL", "REQUESTED RESERVATION", "SUPPLIED RESERVATION", "OLDEST PENDING MS", "OLDEST ACTIVE MS", "REJECTED", "TIMEOUTS", "CONDITION"}, drivers); err != nil {
 					return err
 				}
 			}

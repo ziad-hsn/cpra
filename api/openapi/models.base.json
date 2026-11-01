@@ -1132,7 +1132,10 @@
         "type": "object",
         "properties": {
           "driver": {
-            "$ref": "#/components/schemas/DriverConfig"
+            "$ref": "#/components/schemas/DriverConfig",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Single recovery action. Mutually exclusive with rules.",
+            "x-omitzero": true
           },
           "maxAttempts": {
             "type": "integer",
@@ -1148,12 +1151,61 @@
           "maxFailures": {
             "type": "integer",
             "format": "int64"
+          },
+          "taxonomyVersion": {
+            "type": "string",
+            "maxLength": 16,
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Required for rules. Pins failure codes and prefix expansion; changing it requires explicit configuration application.",
+            "minLength": 1
+          },
+          "rules": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/components/schemas/RecoveryRule"
+            },
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Ordered first match. No match means no intervention. Cannot be combined with driver.",
+            "x-omitempty": false,
+            "x-omitzero": true
           }
         },
-        "required": [
-          "driver"
-        ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "not": {
+          "anyOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "driver"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "rules",
+                      "taxonomyVersion"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "required": [
+                "driver",
+                "rules"
+              ]
+            },
+            {
+              "required": [
+                "driver",
+                "taxonomyVersion"
+              ]
+            }
+          ]
+        }
       },
       "MaintenanceWindow": {
         "type": "object",
@@ -1413,6 +1465,12 @@
             "maxLength": 20,
             "x-go-type-skip-optional-pointer": true,
             "description": "Action-ledger progress sampled by the detail read, encoded as a decimal string. Not a resourceVersion, mutation precondition or resumable cursor."
+          },
+          "recoveryDecision": {
+            "$ref": "#/components/schemas/RecoveryDecision"
+          },
+          "recoveryAdmission": {
+            "$ref": "#/components/schemas/RecoveryAdmission"
           }
         },
         "required": [],
@@ -1685,6 +1743,22 @@
           "resolution": {
             "type": "string",
             "x-go-type-skip-optional-pointer": true
+          },
+          "ruleID": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Guarded rule recovery precondition; required together for rule-based recovery. Not valid on other controls.",
+            "x-go-name": "RuleID"
+          },
+          "decisionRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Guarded rule recovery precondition; required together for rule-based recovery. Not valid on other controls."
+          },
+          "configurationRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Guarded rule recovery precondition; required together for rule-based recovery. Not valid on other controls."
           }
         },
         "required": [
@@ -1846,6 +1920,9 @@
             "type": "string",
             "x-go-type-skip-optional-pointer": true,
             "description": "Captured execution budget as a Go duration such as 45s. For new notifications the first committed start sets deadline; absent means the original absolute-deadline contract."
+          },
+          "recoverySelection": {
+            "$ref": "#/components/schemas/RecoverySelection"
           }
         },
         "required": [
@@ -2731,6 +2808,12 @@
             },
             "x-go-type-skip-optional-pointer": true,
             "description": "Bounded per-driver admission and execution measurements. No target or per-monitor flow identifiers are returned."
+          },
+          "awaitingReconciliation": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Completed notification dispatches retaining reservations until owner reconciliation."
           }
         },
         "required": [
@@ -3321,6 +3404,13 @@
             "type": "array",
             "items": {
               "type": "string"
+            },
+            "x-go-type-skip-optional-pointer": true
+          },
+          "failureTaxonomies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FailureTaxonomy"
             },
             "x-go-type-skip-optional-pointer": true
           }
@@ -5030,6 +5120,16 @@
             "type": "integer",
             "minimum": -4000000,
             "maximum": 4000000
+          },
+          "phase": {
+            "type": "string",
+            "maxLength": 32,
+            "x-go-type-skip-optional-pointer": true
+          },
+          "taxonomyVersion": {
+            "type": "string",
+            "maxLength": 16,
+            "x-go-type-skip-optional-pointer": true
           }
         }
       },
@@ -5133,6 +5233,24 @@
             "description": "Whether the new capacity accounting is supplied by this server.",
             "x-go-type-skip-optional-pointer": true,
             "x-omitempty": false
+          },
+          "destinationConcurrency": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Configured per-destination ceiling. Absent for check queues. Pacing and global allocation can impose smaller limits."
+          },
+          "workerHeadroom": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Driver concurrency allowance minus active work, before destination, sequence, pacing and durable admission restrictions. Not a count of executable notifications."
+          },
+          "rateDeferredTotal": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Process-lifetime count of queued admissions observed waiting for pacing, counted once per admitted copy. Not current blocked depth."
           }
         },
         "required": [
@@ -5377,6 +5495,18 @@
               "$ref": "#/components/schemas/FieldError"
             },
             "x-go-type-skip-optional-pointer": true
+          },
+          "recoveryDecision": {
+            "$ref": "#/components/schemas/RecoveryDecision"
+          },
+          "cancelledNotifications": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Retained cancelled notification attempts. Cancellation is not provider acceptance or delivery."
+          },
+          "recoveryAdmission": {
+            "$ref": "#/components/schemas/RecoveryAdmission"
           }
         },
         "required": [
@@ -5727,6 +5857,348 @@
           "cleanupCoverage"
         ],
         "additionalProperties": false
+      },
+      "FailureMatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "codes"
+        ],
+        "properties": {
+          "codes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "description": "Exact registered codes or terminal dot prefixes, such as tls.cert.*."
+          },
+          "phases": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "maxLength": 32
+            },
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "x-omitzero": true
+          },
+          "httpStatuses": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            },
+            "x-go-name": "HTTPStatuses",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "x-omitzero": true
+          },
+          "grpcCodes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "maxLength": 32
+            },
+            "x-go-name": "GRPCCodes",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "x-omitzero": true
+          },
+          "grpcStatuses": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "items": {
+              "type": "string",
+              "enum": [
+                "UNKNOWN",
+                "NOT_SERVING",
+                "SERVICE_UNKNOWN"
+              ]
+            },
+            "x-go-name": "GRPCStatuses",
+            "x-go-type-skip-optional-pointer": true,
+            "x-omitempty": false,
+            "x-omitzero": true
+          }
+        }
+      },
+      "RecoveryRule": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "match"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+            "x-go-name": "ID"
+          },
+          "match": {
+            "$ref": "#/components/schemas/FailureMatch"
+          },
+          "driver": {
+            "$ref": "#/components/schemas/DriverConfig"
+          },
+          "none": {
+            "type": "boolean",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Explicit no-intervention decision. Exactly one of none=true or driver is required."
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "driver"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "none"
+                    ],
+                    "properties": {
+                      "none": {
+                        "const": true
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "required": [
+                "driver",
+                "none"
+              ],
+              "properties": {
+                "none": {
+                  "const": true
+                }
+              }
+            }
+          ]
+        }
+      },
+      "RecoverySelection": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ruleID": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "RuleID"
+          },
+          "driver": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "configurationRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "decisionRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "incidentID": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "IncidentID"
+          },
+          "observationID": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "ObservationID"
+          }
+        },
+        "required": [
+          "ruleID",
+          "driver",
+          "configurationRevision",
+          "decisionRevision",
+          "incidentID",
+          "observationID"
+        ]
+      },
+      "RecoveryDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "taxonomyVersion": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "configurationRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "decisionRevision": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "candidateRuleID": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "CandidateRuleID"
+          },
+          "observationID": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "x-go-name": "ObservationID"
+          },
+          "reason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "qualifyingObservations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "requiredObservations": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "selected": {
+            "$ref": "#/components/schemas/RecoverySelection"
+          },
+          "qualificationReason": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true,
+            "description": "Qualification from committed observations, separate from permission to execute."
+          }
+        },
+        "required": [
+          "taxonomyVersion",
+          "configurationRevision",
+          "decisionRevision",
+          "observationID",
+          "reason",
+          "qualifyingObservations",
+          "requiredObservations"
+        ]
+      },
+      "FailureCodeInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "message": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "drivers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "available": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "phases",
+          "drivers",
+          "details",
+          "eligible",
+          "available"
+        ]
+      },
+      "FailureTaxonomy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "string",
+            "x-go-type-skip-optional-pointer": true
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FailureCodeInfo"
+            }
+          }
+        },
+        "required": [
+          "version",
+          "codes"
+        ]
+      },
+      "RecoveryAdmission": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Read-only policy assessment at observedAt. It grants no execution permission; writes and starts recheck authority, revisions, cooldowns and fences. Capacity and storage availability are reported separately.",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attemptsUsed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attemptLimit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original execution deadline; absent before first committed start for new actions."
+          },
+          "notBefore": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Earliest time allowed by the observed cooldown; not a reservation."
+          }
+        },
+        "required": [
+          "reason",
+          "observedAt",
+          "attemptsUsed",
+          "attemptLimit"
+        ]
       }
     }
   }

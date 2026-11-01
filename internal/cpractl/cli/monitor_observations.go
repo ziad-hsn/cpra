@@ -82,6 +82,7 @@ func writeMonitorObservations(cmd *cobra.Command, o *options, raw []byte, descri
 			{"Configured notifications", managementDisplay(strings.Join(item.ConfiguredNotifications, ", "))},
 			{"Pending notifications", strconv.FormatInt(item.PendingNotifications, 10)},
 			{"Accepted notifications (retained)", strconv.FormatInt(item.CompletedNotifications, 10)},
+			{"Cancelled notifications (retained)", observationCount(item.CancelledNotifications)},
 			{"Failed notifications (retained)", strconv.FormatInt(item.FailedNotifications, 10)},
 			{"Unknown notifications", strconv.FormatInt(item.UnknownNotifications, 10)},
 			{"Notification conditions sampled at", observationTimestamp(item.NotificationConditionsObservedAt)},
@@ -89,6 +90,12 @@ func writeMonitorObservations(cmd *cobra.Command, o *options, raw []byte, descri
 			{"Unknown provider outcomes", strconv.FormatInt(item.UnknownActions, 10)},
 			{"Actions needing review", strconv.FormatInt(item.ActionsNeedingReview, 10)},
 		}); err != nil {
+			return err
+		}
+		if err := writeRecoveryDecision(cmd, item.RecoveryDecision); err != nil {
+			return err
+		}
+		if err := writeRecoveryAdmission(cmd, item.RecoveryAdmission); err != nil {
 			return err
 		}
 		return writeNotificationConditions(cmd, item.NotificationConditions, item.NotificationConditionsTruncated)
@@ -113,4 +120,11 @@ func writeMonitorObservations(cmd *cobra.Command, o *options, raw []byte, descri
 		return err
 	}
 	return nil
+}
+
+func observationCount(count *int64) string {
+	if count == nil {
+		return "Unavailable"
+	}
+	return strconv.FormatInt(*count, 10)
 }

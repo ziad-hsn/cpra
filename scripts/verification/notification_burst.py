@@ -42,6 +42,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from process import private_process
 
 
 MAX_OUTPUT = 512 * 1024**2
@@ -498,7 +499,9 @@ def main():
     parser.add_argument('--out', type=pathlib.Path, required=True)
     parser.add_argument('--scenario', choices=('burst', 'effect-500-restart', 'queued-restart'), default='burst')
     parser.add_argument('--shared-colors', action='store_true', help='Yellow/red/green share one receiver URL; threshold 2 and every response uses the selected delay')
-    parser.add_argument('--monitors', type=int, choices=(1, 30, 40, 60), required=True)
+    parser.add_argument('--monitors', type=int, choices=(1, 30, 40, 60, 250), required=True)
+    parser.add_argument('--webhook-concurrency', type=int, choices=range(1, 17), default=4)
+    parser.add_argument('--require-long-prestart', action='store_true', help='Require at least one successful notification to wait over 45s before its first start; select a serial/slow workload explicitly')
     parser.add_argument('--outage-seconds', type=int)
     parser.add_argument('--recovery-seconds', type=int)
     parser.add_argument('--receiver-delay', type=float)
@@ -506,7 +509,7 @@ def main():
     if ((args.scenario == 'effect-500-restart' and args.monitors != 1) or
             (args.scenario == 'queued-restart' and args.monitors != 30) or
             (args.scenario == 'burst' and args.monitors == 1)):
-        parser.error('burst uses 30/40/60 monitors; effect-500-restart uses 1; queued-restart uses 30')
+        parser.error('burst uses 30/40/60/250 monitors; effect-500-restart uses 1; queued-restart uses 30')
     if args.shared_colors and (args.scenario != 'burst' or args.monitors != 60):
         parser.error('shared colors apply only to the 60-monitor burst')
     if args.outage_seconds is None:
@@ -557,6 +560,8 @@ def main():
               'check_accounting': 'one shared health URL; target counts are aggregate, complete API pages establish per-monitor observations',
               'outage_seconds': args.outage_seconds, 'recovery_seconds': args.recovery_seconds,
               'red_receiver_delay_seconds': args.receiver_delay,
+              'webhook_concurrency': args.webhook_concurrency,
+              'require_long_prestart': args.require_long_prestart,
               'green_receiver_delay_seconds': args.receiver_delay if args.shared_colors else 0, 'hard_limit_seconds': limit}
     report['clock_limits'] = {'cumulative_drift_seconds': 3, 'step_drift_seconds': 3, 'observation_gap_seconds': 10}
     report['receiver_profile'] = {'protocol': 'HTTP/1.0', 'listen_backlog': max(128, args.monitors * 2),
@@ -583,15 +588,19 @@ def main():
         write_json(out / 'monitors.json', {'monitors': monitors})
         write_json(out / 'runtime.json', {'storage': {'mode': 'raft', 'directory': str(out / 'data'),
                    'batch_delay': '5ms', 'batch_size': 1000, 'snapshot_interval': '5m', 'snapshot_retain': 3},
-                   'history': {'retention_days': 30}})
+                   'history': {'retention_days': 30},
+                   'notifications': {'concurrency': {'webhook': args.webhook_concurrency}}})
         with socket.socket() as reservation:
             reservation.bind(('127.0.0.1', 0))
             port = reservation.getsockname()[1]
         base = 'http://127.0.0.1:' + str(port)
         command = [str(binary), '-yaml', str(out / 'monitors.json'), '-runtime-config', str(out / 'runtime.json'),
                    '-data-dir', str(out / 'data'), '-web.addr', '127.0.0.1:' + str(port)]
-        env = {key: value for key, value in os.environ.items() if not key.startswith('CPRA_AUTH_TOKEN')}
-        env['CPRA_AUTH_TOKEN'] = token
+        token_path=out/'token'
+        with token_path.open('x') as stream:stream.write(token)
+        token_path.chmod(0o600)
+        env = private_process(out,state=out/'data',configuration=out/'runtime.json',credentials=token_path,logs=out/'controller-1.log')
+        command += ['-web.auth-file',str(token_path)]
         report['command'] = command
         report['processes'] = []
 
@@ -834,11 +843,11 @@ def main():
                         report['problems'].extend(report['restart']['problems'])
                 if args.scenario == 'burst':
                     report['boundaries'] = burst_boundaries(final_actions)
-                    report['boundaries']['long_prestart_required'] = not args.shared_colors
+                    report['boundaries']['long_prestart_required'] = args.require_long_prestart
                     if report['boundaries']['execution_budget_violations']:
                         report['status'] = 'fail'
                         report['problems'].append('successful_notification_execution_budget_changed')
-                    if report['status'] == 'pass' and not args.shared_colors and not report['boundaries']['long_prestart_boundary_exercised']:
+                    if report['status'] == 'pass' and args.require_long_prestart and not report['boundaries']['long_prestart_boundary_exercised']:
                         report.update(status='incomplete', stop_reason='long_prestart_boundary_unexercised')
             if errors:
                 report.update(status='incomplete', stop_reason='receiver_failure')

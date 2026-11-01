@@ -289,6 +289,9 @@ func collectionSourceToken(s string) bool {
 	return s != "." && s != ".."
 }
 func collectionDesiredEqual(a, b api.Resource) bool {
+	a.Spec, b.Spec = comparableSpec(a.Kind, a.Spec), comparableSpec(b.Kind, b.Spec)
+	defer clear(a.Spec)
+	defer clear(b.Spec)
 	a.Status, b.Status = nil, nil
 	a.Metadata.UID, a.Metadata.ResourceVersion, b.Metadata.UID, b.Metadata.ResourceVersion = "", "", "", ""
 	a.Metadata.Generation, b.Metadata.Generation = 0, 0

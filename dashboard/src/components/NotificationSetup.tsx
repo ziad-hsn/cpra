@@ -6,6 +6,14 @@ import type { AlertRule, Monitor } from '../api/generated';
 import { ReferencePicker } from './ResourceForms';
 import { ProblemDetails } from './ProblemDetails';
 
+export function validWebhookDestination(value: string): boolean {
+  if (value.length > 8192 || /[\0\r\n]/.test(value)) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && !!parsed.hostname && !parsed.username && !parsed.password && !parsed.hash;
+  } catch { return false; }
+}
+
 /** Compose a small collection; the shared import path owns validation and apply. */
 export function notificationSetupDocuments(monitor: Monitor, name: string, identity: string,
   destination: { endpoint: string } | { credential: string } | { url: string } | { recipient: string }, replaceRules = false) {
@@ -65,11 +73,8 @@ export function NotificationSetup({ disabled, onPrepare, onDirty, onStart, onFin
     setError(''); setProblem(undefined);
     if (!monitorID[0] || !name.trim()) { setError('Choose a monitor and name the recipient.'); return; }
     if (source !== 'new' && !reference[0]) { setError('Choose an existing destination reference.'); return; }
-    if (source === 'new') {
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password || url.length > 8192) throw new Error();
-      } catch { setError('Enter an HTTPS webhook URL without user information, up to 8,192 characters.'); return; }
+    if (source === 'new' && !validWebhookDestination(url)) {
+      setError('Enter an HTTPS webhook URL without user information, fragments or control characters, up to 8,192 characters.'); return;
     }
     if (!onStart()) { setError("Finish or discard the current file preparation first. Your draft is retained."); return; }
     const controller = new AbortController(); request.current = controller;

@@ -242,6 +242,8 @@ func queueObservation(name string, source queue.Queue) api.Queue {
 	}
 	result.Available, result.Depth, result.Capacity = true, int64(stats.QueueDepth), int64(stats.Capacity)
 	result.Drops = stats.Dropped
+	reconciliation := int64(stats.AwaitingReconciliation)
+	result.AwaitingReconciliation = &reconciliation
 	result.Saturated = stats.Capacity > 0 && stats.QueueDepth >= stats.Capacity
 	if result.Saturated {
 		result.LimitReason = "queue_capacity"
@@ -257,9 +259,15 @@ func queueObservation(name string, source queue.Queue) api.Queue {
 		result.AverageWait, result.MaximumWait = durationMeasurement(stats.AvgQueueTime), durationMeasurement(stats.MaxQueueTime)
 	}
 	for _, driver := range stats.Drivers {
+		headroom := int64(driver.WorkerHeadroom)
 		d := api.DriverQueue{Driver: driver.Driver, Pending: int64(driver.Pending), Active: int64(driver.Active), ConcurrencyLimit: int64(driver.ConcurrencyLimit), AdmissionLimit: int64(driver.AdmissionLimit), Rejections: driver.Rejections, Timeouts: driver.Timeouts, Condition: driver.Condition,
+			WorkerHeadroom: &headroom, RateDeferredTotal: &driver.RateDeferredTotal,
 			RequestedCapacity: int64(driver.RequestedCapacity), ReservedCapacity: int64(driver.ReservedCapacity), ReservationAvailable: true,
 			OldestPendingMS: unavailableMeasurement("queue_empty"), OldestActiveMS: unavailableMeasurement("no_active_work")}
+		if driver.DestinationConcurrency != nil {
+			concurrency := int64(*driver.DestinationConcurrency)
+			d.DestinationConcurrency = &concurrency
+		}
 		if driver.Pending > 0 {
 			d.OldestPendingMS = durationMeasurement(driver.OldestPendingAge)
 		}

@@ -192,17 +192,18 @@ func (f *machine) checkWorkerExecutionPins(in WorkerExecutionIntent, at time.Tim
 }
 
 func (f *machine) checkWorkerExecutionAuthority(in WorkerExecutionIntent, at time.Time) error {
-	if err := f.checkCatalogGuard(in.MonitorID, &in.Guard); err != nil {
+	guard := f.workerExecutionGuard(in)
+	if err := f.checkCatalogGuard(in.MonitorID, &guard); err != nil {
 		return err
 	}
 	m, ok := f.image.Monitors[in.MonitorID]
 	controlNotice := in.Category == "notification" && m.ControlNotification(m.Actions[in.ActionID])
-	if !ok || m.Removed || m.CatalogUID != in.MonitorUID || m.Revision != in.MonitorRevision || !controlNotice && m.ControlRevision != in.ControlRevision || m.DependencyRevision != in.Guard.revision() || m.snoozed(at) ||
+	if !ok || m.Removed || m.CatalogUID != in.MonitorUID || (m.Revision != in.MonitorRevision && !m.retainedNotification(m.Actions[in.ActionID])) || !controlNotice && m.ControlRevision != in.ControlRevision || m.DependencyRevision != guard.revision() || m.snoozed(at) ||
 		!controlNotice && (!m.Policy.Enabled || in.Category != "check" && (m.Ignored || m.Policy.InMaintenance(at))) {
 		return ErrWorkerExecutionConflict
 	}
 	source, ok := f.image.Catalog[in.Source.indexKey()]
-	if !ok || source.Removed || source.UID != in.SourceUID || source.Revision != in.SourceRevision {
+	if !ok || source.Removed || source.UID != in.SourceUID || (source.Revision != in.SourceRevision && !(m.retainedNotification(m.Actions[in.ActionID]) && in.Source == (CatalogKey{Kind: "Monitor", ID: m.ID}) && source.Revision == m.CatalogRevision)) {
 		return ErrCatalogDependency
 	}
 	found := false
@@ -236,7 +237,7 @@ func (f *machine) checkWorkerExecution(in WorkerExecutionIntent, at time.Time) e
 	if err != nil {
 		return err
 	}
-	result := transitionAtFormat(m, Command{Kind: "start", MonitorID: in.MonitorID, Revision: in.MonitorRevision, ActionID: in.ActionID, At: at, NoticeRevision: ActionNoticeRevision(m.Actions[in.ActionID])}, f.image.Version)
+	result := transitionAtFormat(m, Command{Kind: "start", Driver: "external", MonitorID: in.MonitorID, Revision: in.MonitorRevision, ActionID: in.ActionID, At: at, NoticeRevision: ActionNoticeRevision(m.Actions[in.ActionID])}, f.image.Version)
 	if !result.Allowed || result.Err != nil {
 		return ErrWorkerExecutionConflict
 	}
@@ -250,11 +251,11 @@ func (f *machine) checkWorkerActionIdentity(in WorkerExecutionIntent) error {
 		return ErrWorkerExecutionConflict
 	}
 	kind := "intervention"
+	if in.ExecutionBudget > 0 && (action.ExecutionBudget != in.ExecutionBudget || !action.Deadline.IsZero()) {
+		return ErrWorkerExecutionConflict
+	}
 	if in.Category == "notification" {
 		kind = "code"
-		if in.ExecutionBudget > 0 && (action.ExecutionBudget != in.ExecutionBudget || !action.Deadline.IsZero()) {
-			return ErrWorkerExecutionConflict
-		}
 		if action.ReviewNotice != nil && in.Notification == nil {
 			return ErrWorkerExecutionConflict
 		}
@@ -262,7 +263,11 @@ func (f *machine) checkWorkerActionIdentity(in WorkerExecutionIntent) error {
 			return ErrWorkerExecutionConflict
 		}
 		sources := m.Policy.WorkerNotificationSources[action.Color]
-		if action.Endpoint < 0 || action.Endpoint >= len(sources) || !sources[action.Endpoint].matches(in) {
+		endpoint := m.ActionEndpoint(action)
+		if m.retainedNotification(action) && in.Source == (CatalogKey{Kind: "Monitor", ID: m.ID}) {
+			in.SourceRevision = m.CatalogRevision
+		}
+		if endpoint < 0 || endpoint >= len(sources) || !sources[endpoint].matches(in) {
 			return ErrWorkerExecutionConflict
 		}
 	}
@@ -509,4 +514,25 @@ func validateWorkerExecutionImage(i image) error {
 		return ErrWorkerExecutionInvalid
 	}
 	return nil
+}
+
+// Only a proven retained resolution may refresh the monitor part of its original
+// guard. Every other dependency and the complete current reference graph are
+// still checked. This never mutates the sealed intent or the worker grant.
+func (f *machine) workerExecutionGuard(in WorkerExecutionIntent) CatalogGuard {
+	m := f.image.Monitors[in.MonitorID]
+	if !m.retainedNotification(m.Actions[in.ActionID]) {
+		return in.Guard
+	}
+	guard := in.Guard.Clone()
+	for i, c := range guard.Conditions {
+		if c.Key == (CatalogKey{Kind: "Monitor", ID: m.ID}) && c.UID == m.CatalogUID {
+			guard.Conditions[i].Revision = m.CatalogRevision
+		}
+	}
+	return guard
+}
+func (f *machine) workerExecutionGuardValid(in WorkerExecutionIntent) bool {
+	g := f.workerExecutionGuard(in)
+	return f.checkCatalogGuard(in.MonitorID, &g) == nil
 }

@@ -39,9 +39,10 @@ var (
 
 type WorkerServerIdentity struct{ ServerID, OwnerEpoch string }
 type WorkerSessionCapability struct {
-	JobTypeID string `json:"job_type_id"`
-	Version   string `json:"version"`
-	Category  string `json:"category"`
+	ProtocolVersion string `json:"protocol_version,omitempty"`
+	JobTypeID       string `json:"job_type_id"`
+	Version         string `json:"version"`
+	Category        string `json:"category"`
 }
 type WorkerPollRequest struct {
 	ServerID        string                    `json:"server_id"`
@@ -127,7 +128,7 @@ func workerCapabilityKey(c WorkerSessionCapability) string {
 	return c.JobTypeID + "\x00" + c.Version + "\x00" + c.Category
 }
 func validWorkerCapability(c WorkerSessionCapability) bool {
-	return catalogIdentifier(c.JobTypeID, 256) && jobTypeSelector(c.Version) && (c.Category == "check" || c.Category == "recovery" || c.Category == "notification")
+	return (c.ProtocolVersion == "" || c.ProtocolVersion == "1" || c.ProtocolVersion == "2" && c.Category == "check") && catalogIdentifier(c.JobTypeID, 256) && jobTypeSelector(c.Version) && (c.Category == "check" || c.Category == "recovery" || c.Category == "notification")
 }
 func (r WorkerPollRequest) validate() error {
 	if !catalogIdentifier(r.ServerID, 256) || !validAuthenticationID(r.WorkerID) || !catalogIdentifier(r.ClientSessionID, 256) || r.SessionID != "" && !catalogIdentifier(r.SessionID, 256) || r.PollSequence == 0 || r.PollSequence > math.MaxInt64 || r.SessionID == "" && r.PollSequence != 1 || r.Capacity < 1 || r.Capacity > 100 || r.Limit < 1 || r.Limit > 100 || r.Limit > r.Capacity || r.WaitSeconds < 0 || r.WaitSeconds > 25 || len(r.Capabilities) < 1 || len(r.Capabilities) > MaxWorkerSessionCapabilities {
@@ -198,21 +199,45 @@ func (c WorkerSessionCommand) validate(at time.Time) error {
 
 // This projection is frozen independently of future poll/session fields.
 type workerPollDigestV1 struct {
-	ServerID        string                    `json:"server_id"`
-	WorkerID        string                    `json:"worker_id"`
-	ClientSessionID string                    `json:"client_session_id"`
-	SessionID       string                    `json:"session_id"`
-	PollSequence    uint64                    `json:"poll_sequence"`
-	Capabilities    []WorkerSessionCapability `json:"capabilities"`
-	Capacity        int                       `json:"capacity"`
-	Limit           int                       `json:"limit"`
-	WaitSeconds     int                       `json:"wait_seconds"`
+	ServerID        string                     `json:"server_id"`
+	WorkerID        string                     `json:"worker_id"`
+	ClientSessionID string                     `json:"client_session_id"`
+	SessionID       string                     `json:"session_id"`
+	PollSequence    uint64                     `json:"poll_sequence"`
+	Capabilities    []workerCapabilityDigestV1 `json:"capabilities"`
+	Capacity        int                        `json:"capacity"`
+	Limit           int                        `json:"limit"`
+	WaitSeconds     int                        `json:"wait_seconds"`
 }
 
 func workerPollDigest(r WorkerPollRequest) string {
-	v := workerPollDigestV1{r.ServerID, r.WorkerID, r.ClientSessionID, r.SessionID, r.PollSequence, r.Capabilities, r.Capacity, r.Limit, r.WaitSeconds}
+	capabilities := make([]workerCapabilityDigestV1, len(r.Capabilities))
+	var protocols []string
+	for i, c := range r.Capabilities {
+		capabilities[i] = workerCapabilityDigestV1{c.JobTypeID, c.Version, c.Category}
+		if c.ProtocolVersion != "" {
+			protocols = make([]string, len(r.Capabilities))
+		}
+	}
+	v := workerPollDigestV1{r.ServerID, r.WorkerID, r.ClientSessionID, r.SessionID, r.PollSequence, capabilities, r.Capacity, r.Limit, r.WaitSeconds}
+	if protocols != nil {
+		for i, c := range r.Capabilities {
+			protocols[i] = c.ProtocolVersion
+		}
+		raw, _ := json.Marshal(struct {
+			Poll      workerPollDigestV1 `json:"poll"`
+			Protocols []string           `json:"protocols"`
+		}{v, protocols})
+		return identity("cpra/worker/poll/v2\x00" + string(raw))
+	}
 	raw, _ := json.Marshal(v)
 	return identity("cpra/worker/poll/v1\x00" + string(raw))
+}
+
+type workerCapabilityDigestV1 struct {
+	JobTypeID string `json:"job_type_id"`
+	Version   string `json:"version"`
+	Category  string `json:"category"`
 }
 
 func (f *machine) checkWorkerPollAuthority(a WorkerAuthority, request WorkerPollRequest, at time.Time) error {

@@ -87,24 +87,43 @@ unknown outcomes after transport interruption or process restart.
 
 ## Notification rejection and retry delays
 
-The controller owns notification retries. An HTTP notification is retried only
-when the selected provider's response proves a retryable rejection. Generic
-webhooks, unrecognized errors, malformed acknowledgements, HTTP 408 and HTTP 5xx
+The controller owns notification retries. A retry requires a proven transient
+failure before any effect, such as a refused connection before transmission,
+or the selected provider's documented retryable rejection. Generic
+webhook responses, unrecognized errors, malformed acknowledgements, HTTP 408 and HTTP 5xx
 leave the action unknown; they do not authorize another invocation. Acceptance
 by a provider remains distinct from observed delivery.
 
 Provider-specific handling follows the
 [provider response verification](provider-testing.md).
-Documented rate-limit delays are committed with the result and survive restart.
+Rate-limit feedback commits separately before ordinary result handling and
+survives restart. A generic `429`, `503` or `Retry-After` can pause a shared scope
+without proving that repeating the affected operation is safe. Committing a
+pause does not grant retry permission.
 The next attempt preserves the original logical delivery identity and overall
 deadline. Its delay is the larger of the provider delay and CPRa's existing
 exponential delay; a delay that cannot fit the remaining deadline ends delivery
 without scheduling another attempt. New ordinary built-in notifications capture
 a 45-second budget at admission and start it at the first committed execution
-start. Waiting for a worker or a serialized destination does not consume that
+start. Waiting for a worker, destination sequence or pacing permission does not consume that
 budget. At most three attempts share the resulting absolute deadline. Each HTTP
 call is bounded by ten seconds or the remaining budget. An older action keeps
 its already recorded deadline; restart, retry and re-offer never renew it.
+
+Runtime `notifications.concurrency` sets a ceiling of 1–16 per driver and
+destination. Generic webhooks default to four; other notification drivers default
+to one. `notifications.pacing` can add a minimum interval and an explicit
+`shared_scope` for destinations sharing an account or channel quota. Scope names
+are local configuration identifiers, not metric labels. Provider scopes are
+added to, not replaced by, explicit scopes. Slack uses at least one second
+between invocations; Discord webhook and Opsgenie API-key scopes remain serial
+while response-driven pauses are enforced. Raising concurrency cannot bypass
+those scopes. Opsgenie keys are scoped by API origin and API key; different keys
+in the same account need an explicit shared scope to coordinate their account
+quota. Teams connector quotas are not assumed to apply to Power Automate
+workflows; configure their actual shared quota explicitly. CPRa orders its own
+invocations, not a provider's asynchronous processing. Debounce and digests are
+not implemented.
 
 A pending condition remains visible while delivery is eligible. Recovery cancels
 an unsent outage opening. An eligible closure for an actually attempted opening

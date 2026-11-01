@@ -31,8 +31,8 @@ func commandWriteFormat(c Command) int {
 		version = joinStorageFormat(version, LifecycleFormatVersion)
 	}
 	switch c.Kind {
-	case "configure", "pulse", "start", "result", "late_result", "recover", "remove", "control", "action_review", "local_action_review":
-		version = joinStorageFormat(version, NotificationConditionFormatVersion)
+	case "configure", "pulse", "start", "result", "late_result", "recover", "remove", "control", "action_review", "local_action_review", "manual_recovery":
+		version = joinStorageFormat(version, DispatchFormatVersion)
 	}
 	// Generic cleanup cannot retire execution-bearing parents. Their source
 	// cleanup uses retire_sources; historical format8/9 keeps its replay semantics.
@@ -53,6 +53,18 @@ func commandWriteFormat(c Command) int {
 // commandMinimumFormat is shared by writers and replay validation. Only the
 // supported envelope versions are admitted; this does not accept future formats.
 func commandMinimumFormat(c Command) int {
+	if c.NotificationPermit != nil || c.NotificationFeedback != nil || c.Kind == "notification_feedback" || collectionProfileV5Command(c) {
+		return joinStorageFormat(DispatchFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.Config != nil && (c.Config.ActionVersion == DispatchFormatVersion || len(c.Config.Policy.NotificationBindings) > 0) {
+		return joinStorageFormat(DispatchFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.ManualRecovery != nil && (c.ManualRecovery.RuleID != "" || c.ManualRecovery.ExpectedDecision != "" || c.ManualRecovery.ExpectedConfiguration != "") {
+		return joinStorageFormat(RecoveryRulesFormatVersion, commandExtensionMinimumFormat(c))
+	}
+	if c.Failure.TaxonomyVersion != "" || c.Failure.Phase != "" || c.Config != nil && requiresRecoveryRules(*c.Config) || collectionProfileV4Command(c) {
+		return joinStorageFormat(RecoveryRulesFormatVersion, commandExtensionMinimumFormat(c))
+	}
 	if c.Kind == "action_project" && c.Revision == "notifications" {
 		return joinStorageFormat(NotificationConditionFormatVersion, commandExtensionMinimumFormat(c))
 	}

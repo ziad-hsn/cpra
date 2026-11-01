@@ -107,12 +107,15 @@ func (f *machine) applyWorkerExpiry(c WorkerExpireCommand, at time.Time) Result 
 		}
 	}
 	a.State, a.Outcome, a.FinishedAt = Cancelled, "worker_admission_expired", at
+	if dispatchStorageFormat(previous.ActionVersion) && !a.Deadline.IsZero() && !at.Before(a.Deadline) {
+		a.TerminationReason = "execution_deadline"
+	}
 	m := previous.Clone()
 	m.Actions[a.ID] = a
 	m.recordNotificationCancellation(a)
 	events := []Event{{MonitorID: m.ID, CatalogUID: a.CatalogUID, Revision: a.Revision, At: at,
 		Type: "action_cancelled", IncidentID: a.IncidentID, ActionID: a.ID, Kind: a.Kind,
-		Color: a.Color, Endpoint: a.Endpoint, Outcome: a.Outcome}}
+		Color: a.Color, Endpoint: a.Endpoint, Outcome: a.Outcome, TerminationReason: a.TerminationReason}}
 	f.image.Version = max(f.image.Version, WorkerExpiryFormatVersion)
 	events = append(events, f.installMonitor(previous, m, at)...)
 	f.publishWorkerMonitor(previous, m)

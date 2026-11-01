@@ -23,7 +23,7 @@ func newApplyCommand(o *options) *cobra.Command {
 	var fileProfile string
 	var timeout time.Duration
 	cmd := &cobra.Command{Use: "apply -f FILE_OR_URL [-f FILE_OR_URL ...]", Short: "Validate and activate a complete collection", Args: cobra.NoArgs,
-		Long: "Freeze all selected inputs, upload inactive staging, validate the complete collection, then activate its original operation. Returns after activation admission unless --wait is set. Stopping the client does not cancel server work. Use get operation ID --results to read bounded retained results. Opt into --file-profile cpra.file.base.v3 to permit later upload recovery from the exact original source bytes and source order; plain apply keeps the ordinary SDK collection contract.",
+		Long: "Freeze all selected inputs, upload inactive staging, validate the complete collection, then activate its original operation. Returns after activation admission unless --wait is set. Stopping the client does not cancel server work. Use get operation ID --results to read bounded retained results. Opt into --file-profile " + collection.FileNormalizationProfile + " to permit later upload recovery from the exact original source bytes and source order; plain apply keeps the ordinary SDK collection contract.",
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
 			if dryRun != "" && dryRun != "server" || timeout < 0 || timeout != 0 && !wait || dryRun != "" && wait {
 				return errors.New("use --dry-run=server or --wait; --timeout requires --wait and must not be negative")
@@ -97,7 +97,7 @@ func newApplyCommand(o *options) *cobra.Command {
 			return nil
 		}}
 	addCollectionInputFlags(cmd, &filenames, &settings)
-	cmd.Flags().StringVar(&fileProfile, "file-profile", "", "explicit file normalization profile: cpra.file.base.v3 (default preserves ordinary apply)")
+	cmd.Flags().StringVar(&fileProfile, "file-profile", "", "explicit file normalization profile: "+collection.FileNormalizationProfile+" (default preserves ordinary apply)")
 	cmd.Flags().Lookup("max-source-bytes").Usage = "cumulative source byte quota (0 uses staging quota for ordinary apply, 64 MiB with --file-profile)"
 	cmd.Flags().Lookup("max-staging-bytes").Usage = "private temporary staging byte quota (0 uses 1 GiB for ordinary apply, 512 MiB with --file-profile)"
 	cmd.Flags().BoolVar(&wait, "wait", false, "wait for the original operation's retained execution result")

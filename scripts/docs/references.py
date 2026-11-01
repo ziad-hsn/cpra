@@ -46,7 +46,8 @@ def source_asset(value: str, public: bool = False) -> str:
     if value not in {"Makefile", "main_externaljobs.go", "examples/management/README.md",
                      "examples/verification/sandboxes.yaml", "examples/cpractl/endpoint.yaml",
                      "examples/cpractl/recipient.yaml", "examples/cpractl/group.yaml",
-                     "examples/cpractl/monitor.yaml", "examples/cpractl/disable.json"}:
+                     "examples/cpractl/monitor.yaml", "examples/cpractl/disable.json",
+                     "examples/intervention-rules/monitor.yaml", "examples/intervention-rules/external.yaml"}:
         if not value.startswith(SOURCE_PREFIXES) or Path(value).suffix not in SOURCE_SUFFIXES:
             raise ValueError(f"reference is not an approved source file: {value}")
     if any(part.lower() in {"secrets", "credentials"} for part in PurePosixPath(value).parts):

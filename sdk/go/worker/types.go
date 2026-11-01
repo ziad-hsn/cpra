@@ -59,6 +59,7 @@ type Registry struct {
 	mu       sync.Mutex
 	frozen   bool
 	handlers map[handlerKey]Handler
+	failures map[handlerKey][]string
 }
 
 // NewRegistry constructs an empty registry for locally compiled handlers.
@@ -68,6 +69,20 @@ func NewRegistry() *Registry { return &Registry{handlers: make(map[handlerKey]Ha
 // It rejects invalid identifiers/categories, duplicates, more than 64 capabilities,
 // and changes after Run has started.
 func (r *Registry) Register(jobTypeID, version, kind string, handler Handler) error {
+	return r.register(jobTypeID, version, kind, handler, nil, false)
+}
+
+// RegisterCheck registers a protocol-2 check and the exact declared custom codes
+// of its immutable JobType version. An empty set still explicitly opts into
+// structured built-in failures. Existing Register calls remain protocol 1.
+func (r *Registry) RegisterCheck(jobTypeID, version string, codes []string, handler Handler) error {
+	if err := api.ValidateJobTypeFailures(api.JobTypeSpec{Kind: "check", ProtocolVersion: "2", FailureCodes: codes}); err != nil {
+		return err
+	}
+	return r.register(jobTypeID, version, "check", handler, codes, true)
+}
+
+func (r *Registry) register(jobTypeID, version, kind string, handler Handler, codes []string, structured bool) error {
 	if r == nil {
 		return errors.New("nil worker registry")
 	}
@@ -90,6 +105,12 @@ func (r *Registry) Register(jobTypeID, version, kind string, handler Handler) er
 		r.handlers = make(map[handlerKey]Handler)
 	}
 	r.handlers[key] = handler
+	if structured {
+		if r.failures == nil {
+			r.failures = make(map[handlerKey][]string)
+		}
+		r.failures[key] = append([]string(nil), codes...)
+	}
 	return nil
 }
 
@@ -105,7 +126,11 @@ func (r *Registry) freeze() (map[handlerKey]Handler, []api.WorkerCapability) {
 	c := make([]api.WorkerCapability, 0, len(r.handlers))
 	for k, h := range r.handlers {
 		m[k] = h
-		c = append(c, api.WorkerCapability{JobTypeID: k.id, Version: k.version, Kind: k.kind})
+		protocol := ""
+		if _, ok := r.failures[k]; ok {
+			protocol = "2"
+		}
+		c = append(c, api.WorkerCapability{JobTypeID: k.id, Version: k.version, Kind: k.kind, ProtocolVersion: protocol})
 	}
 	return m, c
 }

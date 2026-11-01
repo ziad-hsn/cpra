@@ -281,7 +281,8 @@ func validateActionStorageRows(i image, view *collectionLedgerView) error {
 	if err := validateProjectionInventory(i, view, worker); err != nil {
 		return err
 	}
-	return view.walkActions(func(_ []byte, row actionLedgerRow) error {
+	reservations := notificationReservationInventory{}
+	if err := view.walkActions(func(_ []byte, row actionLedgerRow) error {
 		monitor, exists := i.Monitors[row.MonitorID]
 		if row.Deleted {
 			if !notificationConditionStorageFormat(i.Version) || !exists {
@@ -309,11 +310,20 @@ func validateActionStorageRows(i image, view *collectionLedgerView) error {
 				return err
 			}
 		}
-		return validateRetainedAction(i, monitor, row.Action, !current, worker)
-	})
+		if err := validateRetainedAction(i, monitor, row.Action, !current, worker); err != nil {
+			return err
+		}
+		return reservations.add(i, row.Action)
+	}); err != nil {
+		return err
+	}
+	return reservations.validate(i)
 }
 
 func validateRetainedAction(i image, monitor Monitor, a Action, archived bool, worker workerActionValidation) error {
+	if err := validateNotificationActionLimits(a, i.Version); err != nil {
+		return err
+	}
 	if err := validateWorkerRetainedAction(i, a); err != nil {
 		return err
 	}
@@ -343,7 +353,7 @@ func validateRetainedAction(i image, monitor Monitor, a Action, archived bool, w
 			return errActionLedger
 		}
 		alert, exists := monitor.Notifications.ReviewAlerts[a.ReviewNotice.AlertID]
-		if !exists || alert.ActionID != a.ReviewNotice.ActionID {
+		if !exists || alert.ActionID != a.ReviewNotice.ActionID || a.ReviewNotice.Phase == "close" && a.ReviewBinding != alert.Binding {
 			return errActionLedger
 		}
 	}

@@ -1,0 +1,3 @@
+{"eventID":"registration-1","serviceID":"payments","name":"Payments API","healthURL":"https://payments.example.test/health"}
+{"eventID":"registration-2","serviceID":"catalog","name":"Catalog API","healthURL":"https://catalog.example.test/health"}
+{"eventID":"registration-1","serviceID":"payments","name":"Payments API","healthURL":"https://payments.example.test/health"}

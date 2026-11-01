@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestNotificationDeadlineStartsAtIntent(t *testing.T) {
+func TestHistoricalNotificationDeadlineStartsAtIntent(t *testing.T) {
 	s := openCatalogMemory(t)
 	config := testMonitor()
 	config.Policy = lifecyclePolicy()
@@ -15,8 +15,8 @@ func TestNotificationDeadlineStartsAtIntent(t *testing.T) {
 	config.Policy.Endpoints = map[string]int{"red": 1}
 	config.Policy.NotificationTimeouts = map[string][]time.Duration{"red": {time.Minute}}
 	at := policyTime()
-	submit(t, s, Command{Kind: "configure", MonitorID: config.ID, Revision: config.Revision, Config: &config, At: at})
-	m := *submit(t, s, Command{Kind: "pulse", MonitorID: config.ID, Revision: config.Revision, Generation: 1, Outcome: "failure", At: at})[0].Monitor
+	applyCatalogFormat(t, s, ActionFormatVersion, Command{Kind: "configure", MonitorID: config.ID, Revision: config.Revision, Config: &config, At: at})
+	m := *applyCatalogFormat(t, s, ActionFormatVersion, Command{Kind: "pulse", MonitorID: config.ID, Revision: config.Revision, Generation: 1, Outcome: "failure", At: at})[0].Monitor
 	var a Action
 	for _, candidate := range m.Actions {
 		if candidate.Color == "red" {
@@ -29,8 +29,8 @@ func TestNotificationDeadlineStartsAtIntent(t *testing.T) {
 	if err := s.fsm.Restore(io.NopCloser(bytes.NewReader(captureSnapshotBytes(t, s.fsm)))); err != nil {
 		t.Fatal(err)
 	}
-	submit(t, s, Command{Kind: "recover", At: at.Add(time.Minute)})
-	r := submit(t, s, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, ActionDeadline: at.Add(2 * time.Minute), At: at.Add(time.Minute)})[0]
+	applyCatalogFormat(t, s, ActionFormatVersion, Command{Kind: "recover", At: at.Add(time.Minute)})
+	r := applyCatalogFormat(t, s, ActionFormatVersion, Command{Kind: "start", MonitorID: m.ID, Revision: m.Revision, ActionID: a.ID, ActionDeadline: at.Add(2 * time.Minute), At: at.Add(time.Minute)})[0]
 	if r.Allowed {
 		t.Fatal("expired queue acquired a new budget")
 	}
@@ -85,18 +85,21 @@ func TestRecoveryRetryRequiresTransientProofAndOriginalBudget(t *testing.T) {
 	}
 }
 
-func TestManualRecoveryAfterExpiredAttemptHasNewBudget(t *testing.T) {
+func TestManualRecoveryAfterExpiredAttemptCannotRenewIncidentBudget(t *testing.T) {
 	s := openCatalogMemory(t)
 	m, g := manualFixture(t, s)
 	at := policyTime().Add(2 * time.Second)
 	m = *mustResult(t, s, manualCommand(m, g, "first-manual", at)).Monitor
 	first := latestManual(t, m)
 	m = finishManualFailure(t, s, m, g, at.Add(time.Millisecond))
-	later := at.Add(2 * time.Minute)
-	m = *mustResult(t, s, manualCommand(m, g, "second-manual", later)).Monitor
-	next := latestManual(t, m)
-	if !next.Manual || !next.Deadline.After(first.Deadline) || !next.QueuedAt.Equal(later) {
-		t.Fatal("fresh audited authorization inherited the expired automatic budget")
+	record, ok, err := s.Action(first.ID)
+	if err != nil || !ok || record.Action.Deadline.IsZero() {
+		t.Fatal("original attempt evidence missing", err)
+	}
+	later := record.Action.Deadline.Add(time.Second)
+	result := submit(t, s, manualCommand(m, g, "second-manual", later))[0]
+	if result.Err != ErrRecoveryIneligible || result.Allowed {
+		t.Fatal("manual request renewed expired incident budget", result.Err)
 	}
 	if err := s.fsm.Restore(io.NopCloser(bytes.NewReader(captureSnapshotBytes(t, s.fsm)))); err != nil {
 		t.Fatal(err)
@@ -128,6 +131,11 @@ func TestAgentNoEffectRetryAndLateEvidenceSurviveSnapshot(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			started, exists, err := s.Action(a.ID)
+			if err != nil || !exists {
+				t.Fatal("committed start unavailable", err)
+			}
+			a = started.Action
 			if err := h.Finish(t.Context()); err != nil {
 				t.Fatal(err)
 			}

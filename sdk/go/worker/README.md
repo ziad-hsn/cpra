@@ -274,10 +274,11 @@ go test -race -tags externaljobs ./...
 ```
 
 Initial release tags are `sdk/go/worker/v0.1.0-rc.1` and, after qualification,
-`sdk/go/worker/v0.1.0`. Journal format is **2**. Worker UID is bound into metadata and encryption AAD;
+`sdk/go/worker/v0.1.0`. Journal format is **3**. Worker UID is bound into metadata and encryption AAD;
 records retain their original session and execution identities. Format 1 is
 explicitly rejected with `ErrJournalVersion`, preserving its records and key.
-There is no automatic migration, journal reset, or outbox deletion. SDK, server API, worker protocol,
+Format 2 requires the explicit stopped conversion described below; startup never
+converts it automatically. There is no journal reset or outbox deletion. SDK, server API, worker protocol,
 and journal versions are separate compatibility contracts. No tag is implied to
 exist merely because it appears in the candidate module requirement.
 
@@ -309,3 +310,64 @@ For publication from the complete repository checkout, follow the
 [maintainer publishing guide](../../../docs/sdk/publishing.md). The guide is a
 repository document outside this nested module archive; the installation and
 execution requirements above remain available in the downloaded module.
+
+## Structured check failures and journal upgrade
+
+A protocol-2 check JobType declares up to 32 `custom.*` failure codes on its
+immutable version. Register exactly that code set with `Registry.RegisterCheck`:
+
+```go
+err := registry.RegisterCheck("cache-probe", "v1", []string{"custom.cache.full"},
+    func(ctx context.Context, job worker.Job) (api.Outcome, error) {
+        // Perform the real check here. Report this code only when the
+        // provider observation establishes the condition it describes.
+        return api.Outcome{Status: "failure", Failure: &api.WorkerFailure{
+            Code: "custom.cache.full", Phase: "check",
+        }}, nil
+    })
+```
+
+Use `Register` for an existing protocol-1 handler. Protocol 2 is explicitly
+advertised and matched; the runner rejects a mismatched assignment before
+requesting a start. Reports carry a code, phase and allowlisted typed details,
+not a public message or an intervention selection. The server validates the
+original JobType/execution/grant and supplies the message. `noData` and local
+unavailability cannot authorize a rule action. Unknown intervention effects
+remain separate from check failures and cannot gain retry permission from them.
+
+The journal saves the complete bounded report before transmission. A lost
+receipt reuses that identical report and never reruns the handler.
+
+New journals use format 3. `New` refuses format 2; upgrade explicitly while the
+worker is stopped, retaining its complete backup and matching wrapping key:
+
+```go
+backupPath, err := worker.ConvertJournal(ctx, worker.Config{
+    StateDir: absoluteStateDir, WrappingKeyPath: absoluteKeyPath,
+    ServerID: expectedServerID, WorkerID: provisionedWorkerID,
+    WorkerUID: provisionedWorkerUID,
+})
+```
+
+Only identities, paths and optional journal limits are needed; conversion calls
+no handler, credential resolver or network client. It acquires the same exclusive
+lock, authenticates the retained records, publishes an encrypted format-2 backup
+without overwriting an existing file, and converts in one synchronous bbolt
+transaction. All original start markers, grants, deadlines, unknown outcomes,
+receipts and late evidence survive. It refuses substituted paths, wrong keys,
+identity mismatch, corrupted records and input limits that cannot contain the
+source. It creates neither a missing state directory nor a missing journal.
+
+Allow space for the original allocation, a complete backup and bbolt's
+copy-on-write growth. `AllocatedBytes` bounds the source admitted to conversion;
+it is not a hard completion-write limit. Final allocation can grow, just as an
+already-reserved outcome may finish above the admission threshold. Check actual
+allocated size before restarting. Logical deletion does not imply file shrinkage.
+
+Interruption leaves either the complete old format or complete new format. Keep
+the synchronized original backup in either case. If a retry finds an existing
+`worker.format2-<journal-id>.db`, inspect the stopped journal and retain/move that
+backup deliberately before retrying; the converter never replaces it. A
+successful format-3 open does not authorize replay of interrupted handlers.
+Native filesystem guarantees still require qualification on the deployed OS;
+a process-kill test does not establish universal power-loss behavior.

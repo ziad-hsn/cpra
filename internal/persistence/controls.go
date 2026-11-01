@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"errors"
+	"github.com/ziad-hsn/cpra/sdk/go/api"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -79,6 +80,8 @@ func (c ControlCommand) validate(at time.Time) error {
 // MonitorStatus is an observation projection with no action maps, provider
 // configuration, actor notes or other large per-monitor allocations.
 type MonitorStatus struct {
+	RecoveryAdmission                                                 *api.RecoveryAdmission
+	RecoveryDecision                                                  *api.RecoveryDecision
 	NotificationConditions                                            []NotificationConditionObservation
 	NotificationConditionsTruncated                                   bool
 	Ignored                                                           bool

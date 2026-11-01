@@ -4,13 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
 
 func TestRetainedActionReviewAndLateEvidenceUseExactRecord(t *testing.T) {
 	s := openCatalogMemory(t)
-	m, a, g, execution := localUnknown(t, s)
+	m, a, g, execution := localUnknownAt(t, s, time.Now().UTC())
+	// Keep executor completion on the fixture clock, within its recorded budget.
+	returned := a.StartedAt.Add(2 * time.Second)
+	execution.returnedAt.Store(&returned)
 	if err := execution.Finish(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +33,7 @@ func TestRetainedActionReviewAndLateEvidenceUseExactRecord(t *testing.T) {
 		s.fsm.updateActionIndexes(previous, projected)
 	}
 	archive()
-	at := time.Now().UTC().Add(time.Minute)
+	at := a.StartedAt.Add(time.Minute)
 	review := reviewCommand(m, a, "archived-review", "rejected", at)
 	stale := *review.ActionReview
 	stale.ExpectedRevision = "outdated"
@@ -45,21 +49,22 @@ func TestRetainedActionReviewAndLateEvidenceUseExactRecord(t *testing.T) {
 	}
 	// A contradictory late result must still cancel later queued recovery and
 	// supersede the reviewed assertion, despite the action leaving the hot map.
-	m = *mustResult(t, s, manualCommand(m, g, "after-archived-review", at.Add(2*time.Minute))).Monitor
+	m = *mustResult(t, s, manualCommand(m, g, "after-archived-review", at.Add(time.Minute))).Monitor
 	queued := latestManual(t, m)
 	archive()
 	if !s.fsm.operationCurrent(*r.Operation) {
 		t.Fatal("pending receipt lost its archived action dependency")
 	}
 	late := Command{Kind: "late_result", MonitorID: m.ID, Revision: a.Revision, ActionID: a.ID,
-		Outcome: "success", ExecutionStart: a.StartedAt, ExecutionEnd: a.StartedAt.Add(time.Second), At: at.Add(3 * time.Minute)}
+		Outcome: "success", ExecutionStart: a.StartedAt, ExecutionEnd: a.StartedAt.Add(time.Second), At: at.Add(2 * time.Minute)}
 	r = mustResult(t, s, late)
 	current := r.Monitor.Actions[a.ID]
 	if !current.Held() || !current.Review.Conflict || current.LateEvidence == nil || r.Monitor.Actions[queued.ID].State != Cancelled {
 		t.Fatal("archived contradictory evidence failed to restore hold and fence queued recovery")
 	}
+	// The receipt is read through its public lookup after moving to history.
 	if receipt, err := s.Operation("archived-review"); err != nil || receipt.Outcome != "superseded" {
-		t.Fatal("archived review receipt was not superseded", err)
+		t.Fatal("archived review receipt was not superseded", receipt, err)
 	}
 	archive()
 	if duplicate := submit(t, s, late)[0]; duplicate.Err != nil || !duplicate.Allowed || duplicate.Monitor != nil {
@@ -68,13 +73,18 @@ func TestRetainedActionReviewAndLateEvidenceUseExactRecord(t *testing.T) {
 }
 
 func TestActionLedgerSnapshotRejectsInvalidArchivedEvidence(t *testing.T) {
-	for _, damage := range []string{"retry", "executor", "review", "diagnostic", "late", "kind"} {
+	for _, damage := range []string{"valid", "retry", "executor", "review", "diagnostic", "late", "kind"} {
 		t.Run(damage, func(t *testing.T) {
 			store := openCatalogMemory(t)
 			configure(t, store)
 			i := store.fsm.image
 			i.Index = 20
 			m := i.Monitors["stable-one"]
+			// A ledger imported before projection migration has no cached action
+			// summaries. Keep this fixture focused on archived row validation.
+			m.ActionProjection = nil
+			i.Monitors = map[string]Monitor{m.ID: m}
+			i.ActionProjectionState = nil
 			at := time.Now().UTC()
 			a := Action{ID: "archived", Revision: m.Revision, FileIncarnation: m.FileIncarnation,
 				Kind: "intervention", Attempt: 1, State: Failed, Outcome: "rejected", NotBefore: at,
@@ -113,7 +123,7 @@ func TestActionLedgerSnapshotRejectsInvalidArchivedEvidence(t *testing.T) {
 			// Generate complete canonical framing and checksums without the export
 			// semantic gate, to exercise import rather than an earlier checksum error.
 			var encoded bytes.Buffer
-			encoded.WriteString(actionSnapshotMagic)
+			fmt.Fprintf(&encoded, "CPRA-COLLECTION-SNAPSHOT-%d\n", i.Version)
 			if err := json.NewEncoder(&encoded).Encode(i); err != nil {
 				t.Fatal(err)
 			}
@@ -124,8 +134,19 @@ func TestActionLedgerSnapshotRejectsInvalidArchivedEvidence(t *testing.T) {
 			if restored != nil {
 				_ = restored.Close()
 			}
-			if err == nil {
-				t.Fatal("invalid archived evidence passed snapshot import")
+			if damage == "valid" {
+				if err != nil {
+					t.Fatal("undamaged archived evidence failed snapshot import", err)
+				}
+			} else {
+				worker, e := newWorkerActionValidation(i)
+				if e != nil {
+					t.Fatal(e)
+				}
+				semanticErr := validateRetainedAction(i, m, a, true, worker)
+				if semanticErr == nil || err == nil || err.Error() != semanticErr.Error() {
+					t.Fatal("snapshot did not reach archived evidence validation", err, semanticErr)
+				}
 			}
 		})
 	}
@@ -148,6 +169,11 @@ func TestActionLedgerRetainsCompletedRetryAttempt(t *testing.T) {
 	if err != nil {
 		t.Fatal("start denied", err)
 	}
+	started, exists, err := store.Action(id)
+	if err != nil || !exists {
+		t.Fatal("committed start unavailable", err)
+	}
+	first = started.Action
 	finished := at.Add(time.Second)
 	failure := NewFailureDiagnostic("rejected")
 	submit(t, store, Command{Kind: "result", MonitorID: m.ID, Revision: m.Revision, ActionID: id, At: finished, Outcome: "failure", Retryable: true, Failure: failure})

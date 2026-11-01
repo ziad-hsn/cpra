@@ -30,7 +30,6 @@ const (
 	managementPrincipalSnapshots = 16
 	managementMaxPageBytes       = 8 << 20
 	managementMaxMutations       = 8
-	managementCursorIdle         = 30 * time.Second
 )
 
 // cursorActivity is shared by detached readers and the retained view. All
@@ -70,6 +69,7 @@ type managementSnapshot struct {
 	actionOwner           *management.ActionView
 	monitors              snapshotPageView[api.MonitorObservation]
 	monitorID             string
+	incidentQuery         string
 	principal             string
 	generation            uint64
 	kind                  string
@@ -177,6 +177,7 @@ func (s *Server) registerManagement(mux *http.ServeMux) {
 		}
 		result := api.Capabilities{APIVersions: []string{"v1", "v2"}, Drivers: map[string][]string{"check": {}, "recovery": {}, "notification": {}}, Resources: []string{}, PatchTypes: []string{"application/merge-patch+json"}, ResourceOperations: map[string][]string{}}
 		result.NotificationColors = []string{"yellow", "red", "cyan", "green", "gray", "blue"}
+		result.FailureTaxonomies = failureTaxonomies()
 		result.Resources = append(result.Resources, "Version", "Schema", "MonitorObservation")
 		result.ResourceOperations["MonitorObservation"] = []string{"ListMonitorObservations", "GetMonitorObservation"}
 		result.ResourceOperations["Version"] = []string{"GetVersion"}
@@ -322,6 +323,8 @@ func writeManagementError(w http.ResponseWriter, err error) {
 		status, code, title, detail = 412, "versionConflict", "Precondition Failed", "The action observation or review changed. Reload before reviewing."
 	case errors.Is(err, persistence.ErrRecoveryIneligible):
 		status, code, title, detail = 409, "recoveryIneligible", "Conflict", "Recovery is not eligible under the current monitor state and configured limits."
+	case errors.Is(err, persistence.ErrRecoveryRules):
+		status, code, title, detail = 422, "invalidRecoveryRule", "Unprocessable Content", "Check the selected rule and its decision and configuration preconditions."
 	case errors.Is(err, persistence.ErrRecoveryRateLimited):
 		status, code, title, detail = 429, "recoveryRateLimited", "Too Many Requests", "The configured manual recovery limit has been reached."
 	case errors.Is(err, persistence.ErrExecutorUnfenced):

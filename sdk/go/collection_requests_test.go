@@ -80,6 +80,25 @@ func TestCollectionRequestsValidateBeforeHTTP(t *testing.T) {
 	}
 }
 
+func TestCollectionRuleProfilePreparationAndHistoricalContinuation(t *testing.T) {
+	input := validCollectionFixture(t)
+	for _, profile := range []string{"", "cpra.file.base.v1", "cpra.file.base.v2", "cpra.file.base.v3", "cpra.file.base.v4", "cpra.file.base.v5", "cpra.file.base.v6"} {
+		t.Run(profile, func(t *testing.T) {
+			request := api.CollectionPrepareRequest{IdentityFormat: api.CollectionPrepareRequestIdentityFormat(input.IdentityFormat), IdentityKey: input.IdentityKey, SourceFingerprint: input.SourceFingerprint, ContentDigest: input.ContentDigest, ItemCount: input.ItemCount, NormalizationProfile: profile}
+			current := profile == "" || profile == "cpra.file.base.v5"
+			if err := validateCollectionPreparation(request); (err == nil) != current {
+				t.Fatalf("new preparation profile %q: %v", profile, err)
+			}
+			// Existing admitted operations retain their original normalization and
+			// identity. New preparation must not silently use an older profile.
+			creation := api.OperationCreateRequest{AdmissionTicket: "original-ticket", IdentityFormat: api.OperationCreateRequestIdentityFormat(input.IdentityFormat), IdentityKey: input.IdentityKey, SourceFingerprint: input.SourceFingerprint, ContentDigest: input.ContentDigest, ItemCount: input.ItemCount, NormalizationProfile: profile}
+			if err := validateCollectionCreation(creation); (err == nil) != (profile != "cpra.file.base.v6") {
+				t.Fatalf("original admitted profile %q: %v", profile, err)
+			}
+		})
+	}
+}
+
 func TestCollectionCreationAndUploadRejectUnboundInputs(t *testing.T) {
 	calls := 0
 	client := fixture(t, func(w http.ResponseWriter, r *http.Request) { calls++; w.WriteHeader(500) }, nil)

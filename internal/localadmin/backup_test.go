@@ -17,7 +17,7 @@ import (
 )
 
 func TestStoppedBackupRestorePreservesIncidentHistoryAndUnknown(t *testing.T) {
-	root := t.TempDir()
+	root := backupCollectionRoot(t)
 	key := backupTestKey(t, root)
 	source := filepath.Join(root, "state")
 	backup := filepath.Join(root, "backup")

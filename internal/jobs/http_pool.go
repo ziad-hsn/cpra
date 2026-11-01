@@ -40,6 +40,7 @@ func doEffect(client *http.Client, request *http.Request) (*http.Response, error
 	copy := *client
 	copy.Transport = recorder
 	response, err := copy.Do(request)
+	observeNotificationRate(request.Context(), response)
 	return response, recorder.restore(err)
 }
 

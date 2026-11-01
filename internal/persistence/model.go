@@ -33,6 +33,7 @@ const (
 // Policy is deliberately an allowlist of non-secret decision inputs.
 type Policy struct {
 	policyExtensions
+	RecoveryRules           RecoveryRules              `json:"recovery_rules,omitzero"`
 	AutoIgnore              *AutoIgnorePolicy          `json:"auto_ignore,omitempty"`
 	Interval                time.Duration              `json:"interval"`
 	Unhealthy               int                        `json:"unhealthy"`
@@ -43,6 +44,7 @@ type Policy struct {
 	RecoveryBypass          bool                       `json:"recovery_bypass"`
 	Endpoints               map[string]int             `json:"endpoints,omitempty"`
 	NotificationDrivers     map[string][]string        `json:"notification_drivers,omitempty"`
+	NotificationBindings    map[string][]string        `json:"notification_bindings,omitempty"`
 	NotificationEndpointIDs map[string][]string        `json:"notification_endpoint_ids,omitempty"`
 	NotificationTimeouts    map[string][]time.Duration `json:"notification_timeouts,omitempty"`
 	NotificationTriggers    map[string]string          `json:"notification_triggers,omitempty"`
@@ -57,6 +59,10 @@ type Policy struct {
 }
 
 type Action struct {
+	ReviewBinding              string              `json:"review_binding,omitempty"`
+	NotificationPermit         *NotificationPermit `json:"notification_permit,omitempty"`
+	NotificationFeedbackDigest string              `json:"notification_feedback_digest,omitempty"`
+	Rule                       RecoverySelection   `json:"rule,omitzero"`
 	ProviderKey                string              `json:"provider_key,omitempty"`
 	ExecutionBudget            time.Duration       `json:"execution_budget,omitempty"`
 	TerminationReason          string              `json:"termination_reason,omitempty"`
@@ -101,12 +107,15 @@ type Action struct {
 }
 
 type Monitor struct {
+	resolutionSlots            map[string]int
+	RecoveryDecision           RecoveryDecision  `json:"recovery_decision,omitzero"`
 	ActionProjection           *ActionProjection `json:"action_projection,omitempty"`
 	ReviewAssessmentKey        string            `json:"review_assessment_key,omitempty"`
 	ReviewPolicyID             string            `json:"review_policy_id,omitempty"`
 	ReviewRevisionDigest       string            `json:"review_revision_digest,omitempty"`
 	reviewEndpointIDs          map[int]string    // One detached assessment destination, never serialized.
 	reviewTimeouts             map[int]time.Duration
+	reviewBindings             map[int]string
 	reviewAssessment           bool                 // Detached bounded assessment, never serialized.
 	InstallationID             string               `json:"installation_id,omitempty"`
 	retainedActions            map[string]Action    // Transition-local final records removed from the execution projection.
@@ -196,6 +205,7 @@ func (m Monitor) Clone() Monitor {
 	m.ActionProjection = m.ActionProjection.clone()
 	m.reviewEndpointIDs = maps.Clone(m.reviewEndpointIDs)
 	m.reviewTimeouts = maps.Clone(m.reviewTimeouts)
+	m.reviewBindings = maps.Clone(m.reviewBindings)
 	if m.AdoptedFileIncarnation != nil {
 		incarnation := *m.AdoptedFileIncarnation
 		m.AdoptedFileIncarnation = &incarnation
@@ -209,6 +219,7 @@ func (m Monitor) Clone() Monitor {
 	m.IgnoreIncidents = append([]time.Time(nil), m.IgnoreIncidents...)
 	m.ManualRequests = append([]time.Time(nil), m.ManualRequests...)
 	m.Policy = m.Policy.Clone()
+	m.prepareResolutionSlots()
 	m.Actions = maps.Clone(m.Actions)
 	for id, action := range m.Actions {
 		m.Actions[id] = action.Clone()
@@ -220,6 +231,8 @@ func (m Monitor) Clone() Monitor {
 // Command includes observation time and identity at submission, never on replay.
 type Command struct {
 	commandExtensions
+	NotificationPermit   *NotificationPermit       `json:"notification_permit,omitempty"`
+	NotificationFeedback *NotificationFeedback     `json:"notification_feedback,omitempty"`
 	ActionRetirement     *ActionRetirementCommand  `json:"action_retirement,omitempty"`
 	InstallationID       string                    `json:"installation_id,omitempty"`
 	NoticeRevision       string                    `json:"notice_revision,omitempty"`
@@ -326,6 +339,12 @@ func identity(parts string) string {
 }
 
 func validateCommand(c Command) error {
+	if err := validateNotificationLimitCommand(c); err != nil {
+		return err
+	}
+	if c.Kind == "notification_feedback" {
+		return nil
+	}
 	if c.NoticeRevision != "" && (c.Kind != "start" || !catalogIdentifier(c.NoticeRevision, 256)) {
 		return ErrNotificationIdentity
 	}

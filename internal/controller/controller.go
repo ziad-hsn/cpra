@@ -183,6 +183,9 @@ func NewController(config Config) *Controller {
 		SystemLogger.Fatal("Failed to create code HybridQueue: %v", err)
 	}
 
+	if err := codeQueue.(*queue.FairQueue).SetNotificationConcurrency(config.Runtime.Notifications.Concurrency); err != nil {
+		SystemLogger.Fatal("Invalid notification dispatch configuration: %v", err)
+	}
 	pulseLogger := WorkerPoolLogger.WithContext("pulse")
 	pulseWorkerConfig := config.WorkerConfig
 	pulseWorkerConfig.FairDispatch = true
@@ -234,7 +237,7 @@ func NewController(config Config) *Controller {
 	}
 	arkApp.AddSystem(durableSystem)
 
-	return &Controller{
+	controller := &Controller{
 		durableSystem:     durableSystem,
 		app:               arkApp,
 		world:             world,
@@ -251,6 +254,8 @@ func NewController(config Config) *Controller {
 		resultSystems:     []app.System{durableSystem},
 		wakeups:           wakeups,
 	}
+	snapshotHolder.SetProgress(controller.processReady)
+	return controller
 }
 
 // LoadMonitors loads monitors using the streaming loader.
@@ -625,7 +630,7 @@ func (c *Controller) ReadyContext(ctx context.Context) bool {
 }
 
 func (c *Controller) processReady() bool {
-	return c.initializedState.Load() && !c.stoppingState.Load() && (c.durableSystem == nil || c.durableSystem.AdmissionReady()) && time.Since(time.Unix(0, c.lastProgress.Load())) < 30*time.Second
+	return c.initializedState.Load() && !c.stoppingState.Load() && (c.durableSystem == nil || c.durableSystem.Progressing()) && time.Since(time.Unix(0, c.lastProgress.Load())) < 30*time.Second
 }
 
 func (c *Controller) WaitReady(ctx context.Context) error {

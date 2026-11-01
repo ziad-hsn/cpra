@@ -65,7 +65,7 @@ func TestDigestV1WireShape(t *testing.T) {
 	types := []reflect.Type{
 		reflect.TypeFor[AuthenticationCommand](),
 		reflect.TypeFor[AuthenticationPrincipal](), reflect.TypeFor[CatalogMutation](),
-		reflect.TypeFor[ControlCommand](), reflect.TypeFor[ManualRecoveryCommand](),
+		reflect.TypeFor[ControlCommand](), reflect.TypeFor[manualRecoveryDigestV1](),
 		reflect.TypeFor[ActionReviewCommand](), reflect.TypeFor[CatalogGuard](),
 	}
 	var shape strings.Builder
@@ -85,7 +85,11 @@ func TestDigestV1WireShape(t *testing.T) {
 			return
 		}
 		seen[typ] = true
-		fmt.Fprintf(&shape, "%s{", typ.Name())
+		name := typ.Name()
+		if typ == reflect.TypeFor[manualRecoveryDigestV1]() {
+			name = "ManualRecoveryCommand"
+		}
+		fmt.Fprintf(&shape, "%s{", name)
 		for i := 0; i < typ.NumField(); i++ {
 			f := typ.Field(i)
 			if !f.IsExported() || f.Tag.Get("json") == "-" {

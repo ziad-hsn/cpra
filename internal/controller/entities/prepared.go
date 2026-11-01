@@ -43,6 +43,14 @@ type preparedComponents struct {
 
 func (p *PreparedMonitor) MonitorID() string { return p.id }
 func (p *PreparedMonitor) Revision() string  { return p.revision }
+func (p *PreparedMonitor) CheckBinding() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.bundle == nil {
+		return ""
+	}
+	return p.bundle.pulse.TargetBinding
+}
 
 // SetTargetSummary supplies the catalog projection captured before credentials
 // were resolved. Even an empty projection replaces the file-mode default.
@@ -55,6 +63,14 @@ func (p *PreparedMonitor) SetTargetSummary(target string) {
 }
 
 // NotificationEndpointIDs returns copied opaque identities for prepared targets.
+func (p *PreparedMonitor) NotificationBindings(color string) []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.bundle == nil || p.bundle.codes == nil || p.bundle.codes.Configs[color] == nil {
+		return nil
+	}
+	return slices.Clone(p.bundle.codes.Configs[color].EndpointBindings)
+}
 func (p *PreparedMonitor) NotificationEndpointIDs(color string) []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -135,6 +151,7 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 	m.Pulse.Groups = slices.Clone(m.Pulse.Groups)
 	m.Tags = slices.Clone(m.Tags)
 	m.Maintenance = slices.Clone(m.Maintenance)
+	m.Intervention.Rules = manifest.CloneInterventionRules(m.Intervention.Rules)
 	if m.Intervention.Action != "" {
 		if nilConfig(m.Intervention.Target) {
 			return nil, errors.New("intervention target is required")
@@ -198,6 +215,11 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 	if err != nil {
 		return nil, fmt.Errorf("check flow configuration cannot be encoded")
 	}
+	bindingJSON, err := preparer.configurationIdentity(m.Pulse.Config)
+	if err != nil {
+		return nil, err
+	}
+	defer clear(bindingJSON)
 	flowDigest := sha256.Sum256(pulseJSON)
 	var tlsPolicy struct {
 		Skip bool `json:"insecure_skip_verify"`
@@ -209,6 +231,7 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 		name: m.Name, enabled: m.Enabled, maintenance: windows,
 		pulse: components.PulseConfig{
 			FlowKey:                         binary.BigEndian.Uint64(flowDigest[:8]),
+			TargetBinding:                   notificationTargetID("cpra-check-binding-v1/" + m.Pulse.Type + "/" + string(bindingJSON)),
 			TargetSummary:                   m.Pulse.TargetSummary(),
 			CertificateVerificationDisabled: tlsPolicy.Skip,
 			Type:                            m.Pulse.Type, Config: m.Pulse.Config, Timeout: m.Pulse.Timeout,
@@ -245,6 +268,16 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 			}
 		}
 	}
+	if len(m.Intervention.Rules) != 0 {
+		if err := preparer.rules(m.Intervention); err != nil {
+			return nil, err
+		}
+		policy, err := prepareRecoveryRules(m, revision)
+		if err != nil {
+			return nil, err
+		}
+		b.intervention = &components.InterventionConfig{Rules: policy, Choices: m.Intervention.Rules, MaxFailures: max(1, m.Intervention.MaxFailures), MaxAttempts: m.Intervention.MaxAttempts}
+	}
 	if len(codes) > 0 {
 		b.codes = &components.CodeConfig{Configs: make(map[string]*components.ColorCodeConfig, len(codes))}
 	}
@@ -270,13 +303,14 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 		}
 		flows := make([]components.ActionFlow, len(b.jobs.CodeJobs[color]))
 		for index, job := range b.jobs.CodeJobs[color] {
-			if job == nil {
-				continue
-			} // External execution does not enter local queues.
 			driver, config := code.Notify, code.Config
 			if code.NotifyGroup != "" {
 				endpoint := privateEndpoints[privateGroups[code.NotifyGroup][index]]
 				driver, config = endpoint.Type, endpoint.Config
+			}
+			flows[index].Driver = driver
+			if job == nil {
+				continue // External execution retains its type but has no local queue key.
 			}
 			flows[index], err = actionDestination(driver, config)
 			if err != nil {
@@ -291,6 +325,12 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 					return nil, errors.New("notification identity cannot be encoded")
 				}
 				b.codes.Configs[color].EndpointIDs = append(b.codes.Configs[color].EndpointIDs, notificationTargetID("endpoint/"+name+"/"+string(raw)))
+				binding, err := preparer.configurationIdentity(privateEndpoints[name].Config)
+				if err != nil {
+					return nil, err
+				}
+				b.codes.Configs[color].EndpointBindings = append(b.codes.Configs[color].EndpointBindings, notificationTargetID("endpoint/"+name+"/"+privateEndpoints[name].Type+"/"+string(binding)))
+				clear(binding)
 				clear(raw)
 			}
 		} else if len(b.jobs.CodeJobs[color]) != 0 {
@@ -302,6 +342,12 @@ func prepareMonitor(m manifest.Monitor, endpoints map[string]manifest.Endpoint, 
 				return nil, errors.New("notification identity cannot be encoded")
 			}
 			b.codes.Configs[color].EndpointIDs = []string{notificationTargetID("inline/" + string(raw))}
+			binding, err := preparer.configurationIdentity(code.Config)
+			if err != nil {
+				return nil, err
+			}
+			b.codes.Configs[color].EndpointBindings = []string{notificationTargetID("inline/" + code.Notify + "/" + string(binding))}
+			clear(binding)
 			clear(raw)
 		}
 	}
@@ -319,13 +365,21 @@ func notificationTargetID(input string) string {
 // The default preparer constructs only local jobs. Optional preparers may retain
 // inert descriptors in the storage component, never a job that waits remotely.
 type monitorJobPreparer interface {
+	configurationIdentity(any) ([]byte, error)
 	pulse(manifest.Pulse) (jobs.Job, error)
 	intervention(manifest.Intervention) (jobs.Job, error)
+	rules(manifest.Intervention) error
 	codes(string, manifest.CodeConfig, string, map[string]manifest.Endpoint, manifest.NotificationGroups) ([]jobs.Job, error)
 	finish(*components.JobStorage) error
 }
 
 type localJobPreparer struct{}
+
+func (localJobPreparer) configurationIdentity(config any) ([]byte, error) {
+	return json.Marshal(config)
+}
+
+func (localJobPreparer) rules(manifest.Intervention) error { return nil }
 
 func (localJobPreparer) pulse(config manifest.Pulse) (jobs.Job, error) {
 	return jobs.CreatePulseJob(config, ecs.Entity{})

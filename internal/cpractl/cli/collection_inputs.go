@@ -25,7 +25,7 @@ func freezeCollectionInputs(cmd *cobra.Command, filenames []string, settings col
 
 func freezeCollectionInputsProfile(cmd *cobra.Command, filenames []string, settings collection.Options, profile string) (*collection.Frozen, error) {
 	if profile != "" && profile != collection.FileNormalizationProfile {
-		return nil, errors.New("unsupported file profile; use cpra.file.base.v3 or omit --file-profile")
+		return nil, errors.New("unsupported file profile; use cpra.file.base.v4 or omit --file-profile")
 	}
 	sources, cleanup, err := collectionInputSources(cmd, filenames, true)
 	if err != nil {

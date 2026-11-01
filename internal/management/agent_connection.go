@@ -59,16 +59,31 @@ func (c *Catalog) PrepareAgentConnection(ctx context.Context, monitorID, actionI
 	if err != nil {
 		return nil, err
 	}
-	if p.MonitorUID != a.CatalogUID || p.ExecutionRevision != revision || !reflect.DeepEqual(p.Conditions, guard.Conditions) {
+	current, exists, err := c.store.GetContext(ctx, monitorID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists || current.Revision != p.ExecutionRevision || !current.ActionConfigurationCurrent(a.Action) || p.MonitorUID != a.CatalogUID || !reflect.DeepEqual(p.Conditions, guard.Conditions) {
 		return nil, persistence.ErrCatalogDependency
 	}
+	endpoint := current.ActionEndpoint(a.Action)
 	connection := agentConnectionV1{Format: 1}
 	switch a.Kind {
 	case "intervention":
-		if p.Monitor.Intervention.Target == nil {
+		target := p.Monitor.Intervention.Target
+		if a.Rule != (persistence.RecoverySelection{}) {
+			target = nil
+			for _, rule := range p.Monitor.Intervention.Rules {
+				if rule.ID == a.Rule.RuleID && rule.Action == a.Rule.Target.Driver && !rule.None {
+					target = rule.Target
+					break
+				}
+			}
+		}
+		if target == nil {
 			return nil, persistence.ErrAgentActionInvalid
 		}
-		config, ok := p.Monitor.Intervention.Target.(*manifest.InterventionTargetA2A)
+		config, ok := target.(*manifest.InterventionTargetA2A)
 		if !ok || config == nil {
 			return nil, persistence.ErrAgentActionInvalid
 		}
@@ -82,11 +97,11 @@ func (c *Catalog) PrepareAgentConnection(ctx context.Context, monitorID, actionI
 		selected := code.Config
 		if code.NotifyGroup != "" {
 			group := p.NotificationGroups[code.NotifyGroup]
-			if a.Endpoint < 0 || a.Endpoint >= len(group) {
+			if endpoint < 0 || endpoint >= len(group) {
 				return nil, persistence.ErrAgentActionInvalid
 			}
-			selected = p.Endpoints[group[a.Endpoint]].Config
-		} else if a.Endpoint != 0 {
+			selected = p.Endpoints[group[endpoint]].Config
+		} else if endpoint != 0 {
 			return nil, persistence.ErrAgentActionInvalid
 		}
 		config, ok := selected.(*manifest.CodeNotificationA2A)

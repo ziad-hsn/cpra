@@ -19,7 +19,14 @@ export function FieldInput({ field, ...props }: InputHTMLAttributes<HTMLInputEle
 export function useFieldValidation() {
   const { prefix, errors } = useContext(Validation);
   const id = (path: string) => prefix && canonical(path) ? `${prefix}-field-${canonical(path)}` : undefined;
-  const issue = (path: string) => errors.find(error => canonical(path) && canonical(error.field ?? '') === canonical(path));
+  const issue = (path: string) => {
+    const field = canonical(path);
+    if (!field) return undefined;
+    return errors.find(error => canonical(error.field ?? '') === field) ?? errors.find(error => {
+      const child = canonical(error.field ?? '');
+      return child.startsWith(`${field}[`) || child.startsWith(`${field}.`);
+    });
+  };
   return {
     attributes(path = '') {
       const target = id(path), error = issue(path);

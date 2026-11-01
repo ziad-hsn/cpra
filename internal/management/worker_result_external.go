@@ -40,7 +40,7 @@ func (c *Catalog) CommitWorkerOutcome(ctx context.Context, authority persistence
 	}
 	return c.store.CommitWorkerResult(ctx, authority, persistence.WorkerResultInput{ServerID: record.Lifecycle.ServerID,
 		ExecutionID: record.Intent.ID, ExecutionRevision: record.Intent.Revision, GrantID: record.Lifecycle.GrantID,
-		Status: prepared.disposition.Status, Retryable: prepared.disposition.Retryable, Digest: prepared.digest, Payload: prepared.payload}, c.EvaluateWorkerMaintenance)
+		Status: prepared.disposition.Status, Failure: prepared.disposition.Failure, Retryable: prepared.disposition.Retryable, Digest: prepared.digest, Payload: prepared.payload}, c.EvaluateWorkerMaintenance)
 }
 
 // verifyWorkerOutcome authenticates retained ciphertext even when its source or
@@ -75,7 +75,7 @@ func (c *Catalog) verifyWorkerOutcome(ctx context.Context, record persistence.Wo
 		return err
 	}
 	defer clear(encoded)
-	if workerOutcomeDigest(binding, encoded) != record.Result.Input.Digest || disposition.Status != record.Result.Input.Status || disposition.Retryable != record.Result.Input.Retryable {
+	if workerOutcomeDigest(binding, encoded) != record.Result.Input.Digest || disposition.Status != record.Result.Input.Status || disposition.Retryable != record.Result.Input.Retryable || disposition.Failure != record.Result.Input.Failure {
 		return ErrWorkerOutcomeInvalid
 	}
 	return ctx.Err()

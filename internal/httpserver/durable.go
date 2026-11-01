@@ -104,6 +104,7 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleIndexedMonitors(w http.ResponseWriter, r *http.Request, index *fleetview.Index) {
+	availability := s.holder.ControllerAvailability()
 	q := r.URL.Query()
 	filters := map[string]string{}
 	for _, key := range []string{"status", "type", "code", "q"} {
@@ -123,6 +124,7 @@ func (s *Server) handleIndexedMonitors(w http.ResponseWriter, r *http.Request, i
 	var match func(fleetview.MonitorSummary) bool
 	if len(filters) > 0 {
 		match = func(m fleetview.MonitorSummary) bool {
+			m = fleetview.WithControllerAvailability(m, availability)
 			return (filters["status"] == "" || m.Status == filters["status"]) && (filters["type"] == "" || m.PulseType == filters["type"]) && (filters["code"] == "" || m.PendingCode == filters["code"]) && (filters["q"] == "" || strings.Contains(strings.ToLower(m.Name), filters["q"]))
 		}
 	}
@@ -132,5 +134,8 @@ func (s *Server) handleIndexedMonitors(w http.ResponseWriter, r *http.Request, i
 		offset = (page - 1) * size
 	}
 	rows, count := index.Page(offset, size, match)
+	for i := range rows {
+		rows[i] = fleetview.WithControllerAvailability(rows[i], availability)
+	}
 	writeJSON(w, 200, monitorsResp{Generated: index.Overview().Generated, Page: page, Size: size, Total: count, Filters: filters, Monitors: rows})
 }

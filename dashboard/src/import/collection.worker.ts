@@ -68,7 +68,7 @@ async function prepare(sources: SelectedCollectionSource[]): Promise<void> {
         try {
           encoded = new TextEncoder().encode(text);
           if (encoded.byteLength > workerCollectionLimits.resourceBytes) throw new CollectionImportError('quota');
-          if (typeof warnings !== 'string' || warnings.length > 4096) throw new CollectionImportError('unavailable');
+          if (typeof warnings !== 'string' || warnings.length > 16384) throw new CollectionImportError('unavailable');
           inventory!.addItem(encoded, id, document, item, coordinates.length <= (256 << 10) ? JSON.parse(coordinates) : undefined, JSON.parse(warnings));
           encoded = undefined; // The inventory now owns these bytes.
           return true;

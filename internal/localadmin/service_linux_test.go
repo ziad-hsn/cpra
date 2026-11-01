@@ -49,7 +49,7 @@ func TestInstallUsesValidatedExecutableWhenSourceChanges(t *testing.T) {
 			if err := Init(l, "", 0); err != nil {
 				t.Fatal(err)
 			}
-			fixture := t.TempDir()
+			fixture := backupCollectionRoot(t)
 			calls := filepath.Join(fixture, "supervisor-calls")
 			writeServiceFixture(t, filepath.Join(fixture, "systemctl"), "#!/bin/sh\n"+
 				"printf '%s\\n' \"$*\" >> \"$CPRA_TEST_SUPERVISOR_CALLS\"\n"+

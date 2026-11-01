@@ -225,7 +225,7 @@ func TestWorkerSessionBoundsFormatsAndSnapshots(t *testing.T) {
 	for version := 1; version <= LatestFormatVersion+1; version++ {
 		raw, _ := json.Marshal(envelope{Version: version, Commands: []Command{command}})
 		_, err := decodeEnvelope(raw)
-		if (err == nil) != (version == WorkerSessionFormatVersion || version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion) {
+		if (err == nil) != (version == WorkerSessionFormatVersion || version == WorkerExecutionFormatVersion || version == WorkerOfferFormatVersion || version == WorkerResultFormatVersion || version == WorkerLifecycleFormatVersion || version == WorkerFinalizationFormatVersion || version == WorkerSLOFormatVersion || version == WorkerSchedulingFormatVersion || version == WorkerCheckRetentionFormatVersion || version == WorkerNotificationFormatVersion || version == WorkerExpiryFormatVersion || version == WorkerScheduleFormatVersion || version == AgentWorkerFormatVersion || version == RecoveryNotificationWorkerFormatVersion || version == AgentObservationWorkerFormatVersion || version == WorkerQueueFormatVersion || version == NotificationWorkerFormatVersion || version == DeliveryWorkerFormatVersion || version == LifecycleWorkerFormatVersion || version == ActionWorkerFormatVersion || version == WorkerNotificationConditionFormatVersion || version == WorkerRecoveryRulesFormatVersion || version == WorkerDispatchFormatVersion) {
 			t.Fatal("format gate", version, err)
 		}
 	}
@@ -239,7 +239,7 @@ func TestWorkerSessionBoundsFormatsAndSnapshots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.fsm.image.Version != ActionWorkerFormatVersion {
+	if s.fsm.image.Version != WorkerDispatchFormatVersion {
 		t.Fatal("format not advanced")
 	}
 	clone := cloneImageExtensions(s.fsm.image)
@@ -444,17 +444,28 @@ func TestWorkerSessionFrozenPollDigest(t *testing.T) {
 	for n := 0; n < current.NumField(); n++ {
 		field := current.Field(n)
 		old, ok := frozen.FieldByName(field.Name)
+		if field.Name == "Capabilities" {
+			if !ok || old.Tag != field.Tag || old.Type != reflect.TypeFor[[]workerCapabilityDigestV1]() || field.Type != reflect.TypeFor[[]WorkerSessionCapability]() {
+				t.Fatal("capability projection changed without digest review")
+			}
+			continue
+		}
 		if !ok || old.Type != field.Type || old.Tag != field.Tag {
 			t.Fatal("poll digest projection changed", field.Name)
 		}
 	}
-	capability := reflect.TypeFor[WorkerSessionCapability]()
+	capability := reflect.TypeFor[workerCapabilityDigestV1]()
+	currentCapability := reflect.TypeFor[WorkerSessionCapability]()
+	if currentCapability.NumField() != 4 || currentCapability.Field(0).Name != "ProtocolVersion" || currentCapability.Field(0).Type.Kind() != reflect.String || currentCapability.Field(0).Tag != `json:"protocol_version,omitempty"` {
+		t.Fatal("protocol capability requires explicit digest review")
+	}
 	if capability.NumField() != 3 {
 		t.Fatal("nested capability digest fields need versioned projection")
 	}
 	for n, expected := range []string{"JobTypeID", "Version", "Category"} {
 		f := capability.Field(n)
-		if f.Name != expected || f.Type.Kind() != reflect.String {
+		live := currentCapability.Field(n + 1)
+		if f.Name != expected || f.Type.Kind() != reflect.String || f.Name != live.Name || f.Type != live.Type || f.Tag != live.Tag {
 			t.Fatal("capability projection changed")
 		}
 	}
@@ -462,5 +473,16 @@ func TestWorkerSessionFrozenPollDigest(t *testing.T) {
 	const wire = `{"server_id":"server","worker_id":"worker","client_session_id":"run","session_id":"session","poll_sequence":7,"capabilities":[{"job_type_id":"type","version":"v1","category":"check"}],"capacity":16,"limit":10,"wait_seconds":25}`
 	if workerPollDigest(r) != identity("cpra/worker/poll/v1\x00"+wire) {
 		t.Fatal("frozen poll encoding changed")
+	}
+	for _, protocol := range []string{"1", "2"} {
+		r.Capabilities[0].ProtocolVersion = protocol
+		v2Wire := `{"poll":` + wire + `,"protocols":["` + protocol + `"]}`
+		if workerPollDigest(r) != identity("cpra/worker/poll/v2\x00"+v2Wire) {
+			t.Fatal("explicit protocol is not bound to the v2 digest", protocol)
+		}
+	}
+	r.Capabilities[0].ProtocolVersion = ""
+	if workerPollDigest(r) != identity("cpra/worker/poll/v1\x00"+wire) {
+		t.Fatal("historical poll identity was not preserved")
 	}
 }

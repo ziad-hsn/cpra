@@ -16,6 +16,7 @@ type reviewAlertOwner struct {
 	FileIncarnation string `json:"file_incarnation,omitempty"`
 }
 type ReviewAlert struct {
+	Binding                    string            `json:"binding,omitempty"`
 	Owner                      *reviewAlertOwner `json:"owner,omitempty"`
 	ID                         string            `json:"id"`
 	ActionID                   string            `json:"action_id"`
@@ -115,7 +116,7 @@ func (m *Monitor) assessReviewAlerts(at time.Time, emit func(string, *Action)) {
 				if s.ReviewAlerts == nil {
 					s.ReviewAlerts = make(map[string]ReviewAlert)
 				}
-				s.ReviewAlerts[key] = ReviewAlert{ID: key, ActionID: a.ID, IncidentID: m.IncidentID, Revision: m.Revision,
+				s.ReviewAlerts[key] = ReviewAlert{Binding: m.reviewBinding(endpoint), Owner: m.reviewBindingOwner(endpoint), ID: key, ActionID: a.ID, IncidentID: m.IncidentID, Revision: m.Revision,
 					EndpointID: endpointID, Endpoint: endpoint, OpenedAt: at, Health: m.notificationHealth(), ProviderCorrelationVersion: 1}
 				emit("review_alert_opened", &Action{ID: a.ID, Kind: "intervention", CatalogUID: a.CatalogUID, FileIncarnation: a.FileIncarnation, Revision: a.Revision, IncidentID: m.IncidentID,
 					ReviewNotice: &ReviewNotice{AlertID: key, ActionID: a.ID, Phase: "open", Health: m.notificationHealth()}})
@@ -194,7 +195,7 @@ func (m *Monitor) assessReviewAlert(alert ReviewAlert, at time.Time, emit func(s
 		}
 		alert.ClosureSuppressed = m.notificationsSuppressed(at)
 	}
-	if alert.Revision != m.Revision || alert.Endpoint >= m.Policy.Endpoints["blue"] || notificationEndpointIdentity(*m, "blue", alert.Endpoint) != alert.EndpointID {
+	if !m.reviewAlertAuthorized(alert) {
 		alert.ClosureBlocked = "configuration_changed"
 	} else if !m.notificationsSuppressed(at) {
 		alert.ClosureBlocked = ""
@@ -241,6 +242,9 @@ func (m *Monitor) queueReviewNotice(alert *ReviewAlert, phase string, at time.Ti
 		IncidentID: alert.IncidentID, Kind: "code", Color: "blue", Endpoint: alert.Endpoint, EndpointID: alert.EndpointID,
 		NotificationEpisode: alert.ID, NotificationCorrelation: alert.ID, ProviderCorrelationVersion: alert.ProviderCorrelationVersion,
 		Attempt: 1, State: Queued, NotBefore: at, QueuedAt: at, Deadline: at.Add(m.Policy.notificationTimeout("blue", alert.Endpoint)), ReviewNotice: notice}
+	if phase == "close" {
+		a.ReviewBinding = alert.Binding
+	}
 	if budget, ok := m.reviewTimeouts[alert.Endpoint]; ok {
 		a.Deadline = at.Add(budget)
 	}
@@ -339,6 +343,9 @@ func (m Monitor) reviewNoticeEligible(a Action) bool {
 
 func validateReviewNotice(a Action, version int) error {
 	n := a.ReviewNotice
+	if a.ReviewBinding != "" && (!dispatchStorageFormat(version) || !bootstrapHash(a.ReviewBinding) || n == nil || n.Phase != "close") {
+		return errors.New("invalid recovery review delivery binding")
+	}
 	if n == nil {
 		return nil
 	}
@@ -352,6 +359,9 @@ func validateReviewNotice(a Action, version int) error {
 }
 
 func (m Monitor) validateReviewAlert(alert ReviewAlert) error {
+	if alert.Binding != "" && m.ActionVersion != DispatchFormatVersion {
+		return errors.New("review alert binding requires dispatch storage format")
+	}
 	if err := validateReviewAlertFields(alert); err != nil {
 		return err
 	}
@@ -382,11 +392,17 @@ func (m Monitor) validateReviewAlert(alert ReviewAlert) error {
 			started != (!delivery.StartedAt.IsZero() || delivery.Attempt > 1) {
 			return errors.New("review alert delivery identity mismatch")
 		}
+		if phase == "close" && delivery.ReviewBinding != alert.Binding || phase == "open" && delivery.ReviewBinding != "" {
+			return errors.New("review alert delivery binding mismatch")
+		}
 	}
 	return nil
 }
 
 func validateReviewAlertFields(alert ReviewAlert) error {
+	if alert.Binding != "" && (!bootstrapHash(alert.Binding) || alert.Owner == nil) {
+		return errors.New("invalid recovery review alert binding")
+	}
 	if !catalogIdentifier(alert.ID, 256) || !catalogIdentifier(alert.ActionID, 256) || !catalogIdentifier(alert.IncidentID, 256) || alert.Revision == "" || !catalogIdentifier(alert.EndpointID, 256) || alert.Endpoint < 0 || alert.Endpoint >= math.MaxInt32 || alert.OpenedAt.IsZero() || alert.OpenedAt.Year() < 1 || alert.OpenedAt.Year() > 9999 ||
 		(!alert.ClosedAt.IsZero() && (alert.ClosedAt.Before(alert.OpenedAt) || alert.ClosedAt.Year() > 9999)) || alert.CloseReason != "" && alert.CloseReason != "health_recovered" && alert.CloseReason != "action_reviewed" ||
 		(!alert.RecoveredAt.IsZero() && (alert.RecoveredAt.Before(alert.OpenedAt) || alert.RecoveredAt.Year() > 9999)) || alert.ProviderCorrelationVersion != 1 || (alert.ClosedAt.IsZero() != (alert.CloseReason == "")) || alert.ClosingStarted && !alert.OpeningStarted ||

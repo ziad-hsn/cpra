@@ -373,8 +373,23 @@ Normal startup migrates supported older state through committed transitions and
 resumes an interrupted migration before admitting work. Migration does not invoke
 providers, invent evidence that an old notification started, or release an
 unknown intervention. Back up the complete stopped store before upgrading.
-The latest formats are **46/47**, which add pending notification conditions,
-first-start budgets, delivery migration bindings and action retirement progress.
+Formats **46/47** added pending notification conditions, first-start notification
+budgets, delivery migration bindings and action retirement progress. Formats
+**48/49** added versioned failure classification, rule qualification and committed
+intervention selection. The latest formats are **50/51**. They retain those
+contracts and add first-start budgets for new interventions, notification
+dependency bindings and committed provider pacing. Existing actions keep their
+recorded deadlines and identities. See
+[error-dependent intervention rules](intervention-rules.md). Rule activation
+requires fresh observations; migration never reclassifies old evidence or
+renews an execution budget.
+
+Notification resolutions retain the original episode, destination and authorized
+credential dependencies across unrelated changes such as a check interval edit.
+A changed or revoked dependency receives an explicit cancellation or held
+disposition; an old endpoint position never redirects work to a new target.
+An attempted opening can have an eligible resolution even when its outcome was
+unknown. Sending that resolution does not clear the original unknown effect.
 An older executable that cannot read the committed format cannot be used to roll
 back the upgraded directory. Restore a compatible pre-upgrade backup to a separate
 directory only after considering external effects that occurred since it was

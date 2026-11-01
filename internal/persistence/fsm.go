@@ -43,7 +43,7 @@ func decodeEnvelope(data []byte) (envelope, error) {
 		return batch, errors.New("committed command envelope is empty")
 	}
 	for _, c := range batch.Commands {
-		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion || batch.Version == DeliveryFormatVersion || batch.Version == LifecycleFormatVersion || batch.Version == ActionFormatVersion || batch.Version == NotificationConditionFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
+		if (batch.Version == AgentActionFormatVersion || batch.Version == RecoveryNotificationFormatVersion || batch.Version == AgentObservationFormatVersion || batch.Version == NotificationFormatVersion || batch.Version == DeliveryFormatVersion || batch.Version == LifecycleFormatVersion || batch.Version == ActionFormatVersion || batch.Version == NotificationConditionFormatVersion || batch.Version == RecoveryRulesFormatVersion || batch.Version == DispatchFormatVersion) && commandExtensionMinimumFormat(c) != FormatVersion {
 			return batch, errors.New("optional commands require their own storage format")
 		}
 		if c.CollectionExecute != nil && (!collectionExecutionStorageFormat(batch.Version) || len(batch.Commands) != 1) {
@@ -60,9 +60,10 @@ func decodeEnvelope(data []byte) (envelope, error) {
 }
 
 type image struct {
-	ActionProjectionState *actionProjectionState `json:"action_projection_state,omitempty"`
-	InstallationID        string                 `json:"installation_id,omitempty"`
-	ActionStorage         *actionStorageState    `json:"action_storage,omitempty"`
+	NotificationLimits    map[string]NotificationRateState `json:"notification_limits,omitempty"`
+	ActionProjectionState *actionProjectionState           `json:"action_projection_state,omitempty"`
+	InstallationID        string                           `json:"installation_id,omitempty"`
+	ActionStorage         *actionStorageState              `json:"action_storage,omitempty"`
 	imageExtensions
 	CatalogMutationSequence      uint64                          `json:"catalog_mutation_sequence,omitempty"`
 	CollectionAdmissions         map[string]CollectionAdmission  `json:"collection_admissions,omitempty"`
@@ -83,6 +84,8 @@ type image struct {
 	Monitors                     map[string]Monitor              `json:"monitors"`
 }
 type machine struct {
+	actionMetrics         atomic.Pointer[actionMetrics]
+	recoveryPrograms      recoveryProgramCache
 	projectionReviews     map[string]*btree.BTreeG[string]
 	actionPosition        actionLedgerPosition
 	actionWrites          map[string]actionLedgerRow
@@ -110,6 +113,7 @@ type machine struct {
 	actionIndex, actionsByMonitor *btree.BTreeG[actionItem]
 	incidents                     *btree.BTreeG[IncidentRecord]
 	incidentsByMonitor            *btree.BTreeG[IncidentRecord]
+	incidentsByTriage             *btree.BTreeG[IncidentRecord]
 	controls                      *btree.BTreeG[ControlChange]
 	controlChanges                []ControlChange
 	controlSequence, controlEpoch uint64
@@ -185,7 +189,7 @@ func (f *machine) Apply(log *raft.Log) any {
 		if c.At.After(at) {
 			at = c.At
 		}
-		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion || f.image.Version == DeliveryFormatVersion || f.image.Version == LifecycleFormatVersion || f.image.Version == ActionFormatVersion || f.image.Version == NotificationConditionFormatVersion {
+		if f.image.Version == AgentActionFormatVersion || f.image.Version == RecoveryNotificationFormatVersion || f.image.Version == AgentObservationFormatVersion || f.image.Version == NotificationFormatVersion || f.image.Version == DeliveryFormatVersion || f.image.Version == LifecycleFormatVersion || f.image.Version == ActionFormatVersion || f.image.Version == NotificationConditionFormatVersion || f.image.Version == RecoveryRulesFormatVersion || f.image.Version == DispatchFormatVersion {
 			f.image.Version = joinStorageFormat(f.image.Version, commandExtensionMinimumFormat(c))
 		}
 		if mutatesCatalog(c) && !catalogMutationFormat(batch.Version) && catalogMutationFormat(f.image.Version) {
@@ -280,6 +284,18 @@ func (f *machine) Apply(log *raft.Log) any {
 			if r.Monitor != nil {
 				events = append(events, f.installMonitor(f.image.Monitors[c.MonitorID], *r.Monitor, c.At)...)
 			}
+			results = append(results, r)
+			continue
+		}
+		if c.Kind == "notification_feedback" {
+			r := f.applyNotificationFeedback(c)
+			if f.err != nil {
+				return f.err
+			}
+			if r.Monitor != nil {
+				events = append(events, f.installMonitor(f.image.Monitors[c.MonitorID], *r.Monitor, c.At)...)
+			}
+			f.image.Version = joinStorageFormat(f.image.Version, batch.Version)
 			results = append(results, r)
 			continue
 		}
@@ -454,6 +470,9 @@ func (f *machine) Apply(log *raft.Log) any {
 			}
 		}
 		r := transitionAtFormat(previous, c, batch.Version)
+		if c.Kind == "start" {
+			f.admitNotificationPermit(c, &r)
+		}
 		if r.Monitor != nil && (deliveryStorageFormat(batch.Version) || c.Kind == "pulse" && notificationStorageFormat(batch.Version)) {
 			f.image.Version = joinStorageFormat(f.image.Version, batch.Version)
 		}
@@ -478,6 +497,7 @@ func (f *machine) Apply(log *raft.Log) any {
 		return f.err
 	}
 	f.image.Index = log.Index
+	f.actionMetrics.Load().record(events)
 	// Every command path returns detached observations. Control/action handlers
 	// also install immutable maps in the FSM and must not expose those maps.
 	for n := range results {
@@ -507,6 +527,10 @@ func (f *machine) Snapshot() (raft.FSMSnapshot, error) {
 		return nil, fmt.Errorf("history has not reached the snapshot position")
 	}
 	i := image{InstallationID: f.image.InstallationID, LocalExecutorSession: f.image.LocalExecutorSession, Version: f.image.Version, Index: f.image.Index, SLO: f.image.SLO.Clone(), Monitors: make(map[string]Monitor, len(f.image.Monitors))}
+	i.NotificationLimits = make(map[string]NotificationRateState, len(f.image.NotificationLimits))
+	for id, state := range f.image.NotificationLimits {
+		i.NotificationLimits[id] = state
+	}
 	i.ActionProjectionState = f.image.ActionProjectionState.clone()
 	if f.image.ActionStorage != nil {
 		copy := *f.image.ActionStorage
@@ -600,6 +624,9 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 	if err := validateImageExtensions(i); err != nil {
 		return i, err
 	}
+	if err := validateNotificationLimitsImage(i); err != nil {
+		return i, err
+	}
 	if err := validateActionProjectionState(i); err != nil {
 		return i, err
 	}
@@ -636,6 +663,7 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 			return i, errors.New("invalid pending operation receipt")
 		}
 	}
+	reservations := notificationReservationInventory{}
 	for id, m := range i.Monitors {
 		if m.InstallationID != i.InstallationID {
 			return i, errInstallationIdentity
@@ -667,6 +695,11 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 			}
 		}
 		for _, action := range m.Actions {
+			if i.ActionStorage == nil {
+				if err := reservations.add(i, action); err != nil {
+					return i, err
+				}
+			}
 			if action.LateEvidence != nil {
 				if err := action.LateEvidence.validateAtFormat(action, i.Version); err != nil {
 					return i, err
@@ -678,6 +711,11 @@ func decodeImageValue(d *json.Decoder) (image, error) {
 			if (action.State == Queued || action.State == Started) && action.CatalogUID != m.CatalogUID {
 				return i, errors.New("active action belongs to a different monitor incarnation")
 			}
+		}
+	}
+	if i.ActionStorage == nil {
+		if err := reservations.validate(i); err != nil {
+			return i, err
 		}
 	}
 	return i, nil

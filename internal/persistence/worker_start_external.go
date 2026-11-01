@@ -172,7 +172,7 @@ func (f *machine) applyWorkerStart(c WorkerStartCommand, at time.Time, version i
 				if err != nil {
 					return Result{Err: err}
 				}
-				command := Command{Kind: "start", MonitorID: previous.ID, Revision: r.Intent.MonitorRevision, ActionID: r.Intent.ActionID, At: at}
+				command := Command{Kind: "start", Driver: "external", MonitorID: previous.ID, Revision: r.Intent.MonitorRevision, ActionID: r.Intent.ActionID, At: at}
 				command.NoticeRevision = ActionNoticeRevision(previous.Actions[r.Intent.ActionID])
 				if lifecycleStorageFormat(version) {
 					command.Maintenance = c.Maintenance.Active || r.Intent.Category == "notification" && c.Maintenance.SinceQueued

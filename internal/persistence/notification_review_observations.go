@@ -362,7 +362,7 @@ func reviewConditionObservation(owner Monitor, alert ReviewAlert, delivery Actio
 	if alert.ClosureBlocked != "" {
 		v.State, v.Reason = "blocked", alert.ClosureBlocked
 	}
-	if alert.Revision != owner.Revision {
+	if alert.Revision != owner.Revision && !(phase == "close" && alert.OpeningStarted && owner.reviewAlertAuthorized(alert)) {
 		v.State, v.Reason = "blocked", "configuration_changed"
 	}
 	if alert.Owner != nil && !owner.OwnsAction(Action{CatalogUID: alert.Owner.CatalogUID, FileIncarnation: alert.Owner.FileIncarnation}) {

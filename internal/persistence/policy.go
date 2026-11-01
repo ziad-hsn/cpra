@@ -24,6 +24,10 @@ func (p Policy) Clone() Policy {
 	}
 	p.policyExtensions = clonePolicyExtensions(p)
 	p.Endpoints = maps.Clone(p.Endpoints)
+	p.NotificationBindings = maps.Clone(p.NotificationBindings)
+	for color, bindings := range p.NotificationBindings {
+		p.NotificationBindings[color] = slices.Clone(bindings)
+	}
 	p.NotificationEndpointIDs = maps.Clone(p.NotificationEndpointIDs)
 	for color, ids := range p.NotificationEndpointIDs {
 		p.NotificationEndpointIDs[color] = slices.Clone(ids)
@@ -44,6 +48,9 @@ func (p Policy) Clone() Policy {
 // Validate accepts absent optional fields in older records. Zero recovery
 // attempts means the existing single-attempt behavior, not unlimited attempts.
 func (p Policy) Validate() error {
+	if !p.RecoveryRules.IsZero() && (!p.Intervention || p.RecoveryDriver != "" || p.RecoveryTimeout != 0) {
+		return ErrRecoveryRules
+	}
 	if err := p.AutoIgnore.validate(); err != nil {
 		return err
 	}
@@ -60,6 +67,16 @@ func (p Policy) Validate() error {
 	for _, count := range p.Endpoints {
 		if count < 0 || count > math.MaxInt32 {
 			return errors.New("invalid durable notification endpoint count")
+		}
+	}
+	for color, bindings := range p.NotificationBindings {
+		if len(bindings) != p.Endpoints[color] {
+			return ErrNotificationIdentity
+		}
+		for _, binding := range bindings {
+			if len(binding) != 64 || !catalogIdentifier(binding, 64) {
+				return ErrNotificationIdentity
+			}
 		}
 	}
 	for color, ids := range p.NotificationEndpointIDs {
@@ -134,6 +151,9 @@ func (m Monitor) lastRecoveryFailure() time.Time {
 }
 
 func (m Monitor) mayRetryRecovery() bool {
+	if !m.recoveryRuleQualified() {
+		return false
+	}
 	if m.Ignored || !m.Policy.Intervention || m.recoveryAttempts() >= m.Policy.recoveryLimit() || m.pendingIntervention() || m.VerifyRemaining > 0 {
 		return false
 	}
@@ -143,8 +163,11 @@ func (m Monitor) mayRetryRecovery() bool {
 	// Only a confirmed failure of the latest incident attempt permits an
 	// automatic retry. Operator assertions never manufacture provider facts.
 	a, ok := m.latestRecovery()
+	if !m.Policy.RecoveryRules.IsZero() && ok && a.replaceableRuleIntent() {
+		return true
+	}
 	return ok && a.State == Failed && !a.FinishedAt.IsZero() &&
-		(m.ActionVersion != ActionFormatVersion || a.Retryable)
+		(!actionStateVersion(m.ActionVersion) || a.Retryable)
 }
 
 func (m Monitor) recoveryDue(at time.Time) time.Time {

@@ -39,7 +39,7 @@ policy file. Committed worker policy is authoritative.
 
 Worker policy is bounded to 1,024 retained worker identities and 16 MiB of
 canonical state. Revoked identities remain retained. Current writes use storage
-format 46 for the base application and 47 when tagged state is present; supported
+format 48 for the base application and 49 when tagged state is present; supported
 older state retains its replay semantics. Untagged builds refuse external-worker
 state. See [upgrade and backup rules](durability.md) before replacing a binary.
 

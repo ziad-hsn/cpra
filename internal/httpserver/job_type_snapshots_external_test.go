@@ -371,10 +371,11 @@ func TestJobTypeSnapshotCursorBoundsAndOwnership(t *testing.T) {
 func TestExtensionCompletedViewsReclaimCaptureQuota(t *testing.T) {
 	for _, kind := range []string{"JobType", "ExternalWorker"} {
 		t.Run(kind, func(t *testing.T) {
-			m, _ := jobTypeSnapshotHTTP(t)
+			m, clock := jobTypeSnapshotHTTP(t)
 			defer m.closeSnapshots()
 			first := ""
 			for range 8 {
+				clock.Add(int64(time.Millisecond))
 				read, err := m.beginSnapshotRead(t.Context(), kind, url.Values{"limit": {"1"}}, "reader", 1)
 				if err != nil {
 					t.Fatal("completed view exhausted quota", err)

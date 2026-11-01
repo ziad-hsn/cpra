@@ -90,6 +90,7 @@ func NewRootCommand() *cobra.Command {
 		newHealthCommand(o),
 		newReadyCommand(o),
 		newLocalCommand(),
+		newRulesCommand(o),
 		newMetricsCommand(o),
 		newDiffCommand(o),
 		newApplyCommand(o),

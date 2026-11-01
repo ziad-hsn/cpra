@@ -31,6 +31,7 @@ export interface MonitorSummary {
   pending_notifications?: number;
   completed_notifications?: number;
   failed_notifications?: number;
+  cancelled_notifications?: number;
   unknown_notifications?: number;
   actions_needing_review?: number;
   certificate_verification_disabled?: boolean;
@@ -135,6 +136,9 @@ export interface SystemsResponse {
 }
 
 export interface DriverQueueStats {
+	destination_concurrency?: number;
+	worker_headroom?: number;
+	rate_deferred_total?: number;
 	requested_capacity?: number;
 	reserved_capacity?: number;
   driver: string;
@@ -150,6 +154,7 @@ export interface DriverQueueStats {
 }
 
 export interface QueueStats {
+	awaiting_reconciliation?: number;
   drivers?: DriverQueueStats[];
 	/** Nanoseconds for a currently pending admission; consult availability. */
 	oldest_pending_age?: number;

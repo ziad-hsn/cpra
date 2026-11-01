@@ -130,7 +130,7 @@ func (d *workerDispatcher) prepare(request workerDispatchRequest) (persistence.W
 		if !found || action.CatalogUID != in.MonitorUID || action.Revision != in.MonitorRevision {
 			return persistence.WorkerDispatchState{}, persistence.ErrWorkerExecutionConflict
 		}
-		if in.Category == "notification" && action.ExecutionBudget > 0 && action.Deadline.IsZero() {
+		if action.ExecutionBudget > 0 && action.Deadline.IsZero() {
 			in.ExecutionBudget, in.Deadline = action.ExecutionBudget, time.Time{}
 		} else if !action.Deadline.IsZero() && action.Deadline.Before(in.Deadline) {
 			in.Deadline = action.Deadline

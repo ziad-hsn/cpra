@@ -105,8 +105,28 @@ func (c *Catalog) collectJobTypeReferences(ctx context.Context, resource api.Res
 			return nil, err
 		}
 		if spec.Recovery != nil {
-			if err := visit("recovery", spec.Recovery.Driver); err != nil {
+			if err := api.VisitRecoveryDrivers(spec.Recovery, func(_ string, driver *api.DriverConfig) error { return visit("recovery", *driver) }); err != nil {
 				return nil, err
+			}
+			if len(spec.Recovery.Rules) != 0 && spec.Check.Driver.Type == "external" {
+				config, err := externalDriverConfig(spec.Check.Driver)
+				if err != nil {
+					return nil, err
+				}
+				selected, ok, err := lookup(ctx, config.JobTypeID, config.Version)
+				if err != nil {
+					return nil, err
+				}
+				if !ok {
+					return nil, persistence.ErrCatalogDependency
+				}
+				predicates := make([]api.RulePredicate, 0, len(spec.Recovery.Rules))
+				for _, rule := range spec.Recovery.Rules {
+					predicates = append(predicates, api.RulePredicate{ID: rule.ID, Match: rule.Match, None: rule.None})
+				}
+				if _, _, err := api.CompileExternalRulePredicates(selected.Version.FailureContract(), spec.Recovery.TaxonomyVersion, predicates); err != nil {
+					return nil, err
+				}
 			}
 		}
 		if spec.Notifications != nil {

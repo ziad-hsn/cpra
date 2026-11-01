@@ -37,6 +37,7 @@ func workerResultReceiptID(serverID, grantID string, index uint64) string {
 // WorkerResultInput is prepared against the original immutable JobType. The
 // persistence boundary independently verifies the authenticated grant owner.
 type WorkerResultInput struct {
+	Failure           FailureDiagnostic     `json:"failure,omitzero"`
 	ServerID          string                `json:"server_id"`
 	ExecutionID       string                `json:"execution_id"`
 	ExecutionRevision string                `json:"execution_revision"`
@@ -70,6 +71,9 @@ type WorkerResultCommand struct {
 }
 
 func (in WorkerResultInput) validate() error {
+	if in.Failure.validate(WorkerRecoveryRulesFormatVersion) != nil || in.Failure != (FailureDiagnostic{}) && in.Status != "failure" && in.Status != "noData" {
+		return ErrWorkerExecutionInvalid
+	}
 	for _, v := range []string{in.ServerID, in.ExecutionID, in.ExecutionRevision, in.GrantID} {
 		if !catalogIdentifier(v, 256) {
 			return ErrWorkerExecutionInvalid
@@ -179,6 +183,9 @@ func (f *machine) applyWorkerResult(c WorkerResultCommand, at time.Time, index u
 	if err != nil {
 		return Result{Err: err}
 	}
+	if err := validateStructuredWorkerResult(f.image, old, c.Input, version); err != nil {
+		return Result{Err: err}
+	}
 	if old.Intent.Revision != c.Input.ExecutionRevision || !workerResultStatus(c.Input.Status, old.Intent.Category) {
 		return Result{Err: ErrWorkerExecutionConflict}
 	}
@@ -190,7 +197,7 @@ func (f *machine) applyWorkerResult(c WorkerResultCommand, at time.Time, index u
 		return Result{Allowed: true, resultExtensions: resultExtensions{WorkerResult: &receipt}}
 	}
 	if saved := old.Result; saved != nil {
-		if saved.Input.Digest != c.Input.Digest || saved.Input.Status != c.Input.Status || saved.Input.Retryable != c.Input.Retryable {
+		if saved.Input.Digest != c.Input.Digest || saved.Input.Status != c.Input.Status || saved.Input.Retryable != c.Input.Retryable || saved.Input.Failure != c.Input.Failure {
 			return Result{Err: ErrWorkerExecutionConflict}
 		}
 		receipt := saved.Receipt

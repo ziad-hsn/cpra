@@ -1,6 +1,8 @@
 package persistence
 
 import (
+	"encoding/json"
+	"github.com/ziad-hsn/cpra/internal/runtimeconfig"
 	"github.com/ziad-hsn/cpra/internal/secureconfig"
 	"github.com/ziad-hsn/cpra/internal/slo"
 	"time"
@@ -15,7 +17,7 @@ type operationCommandDigestV1 struct {
 	OperationAllocation  *OperationAllocation      `json:"operation_allocation,omitempty"`
 	Authentication       *AuthenticationCommand    `json:"authentication,omitempty"`
 	Restore              *RestoreCommand           `json:"restore,omitempty"`
-	ManualRecovery       *ManualRecoveryCommand    `json:"manual_recovery,omitempty"`
+	ManualRecovery       *manualRecoveryDigestV1   `json:"manual_recovery,omitempty"`
 	ActionReview         *ActionReviewCommand      `json:"action_review,omitempty"`
 	ExecutorSession      string                    `json:"executor_session,omitempty"`
 	Control              *ControlCommand           `json:"control,omitempty"`
@@ -67,7 +69,7 @@ func legacyOperationCommandDigest(c Command) operationCommandDigestV1 {
 	return operationCommandDigestV1{
 		CollectionExecute: c.CollectionExecute, Collection: c.Collection,
 		OperationAllocation: c.OperationAllocation, Authentication: c.Authentication,
-		Restore: c.Restore, ManualRecovery: c.ManualRecovery, ActionReview: c.ActionReview,
+		Restore: c.Restore, ManualRecovery: manualRecoveryProjectionV1(c.ManualRecovery), ActionReview: c.ActionReview,
 		ExecutorSession: c.ExecutorSession, Control: c.Control,
 		CheckControlRevision: c.CheckControlRevision, Bootstrap: c.Bootstrap,
 		Guard: c.Guard, Operation: c.Operation, Catalog: legacyCatalogMutationDigest(c.Catalog), SLO: c.SLO,
@@ -114,4 +116,37 @@ func legacyCatalogMutationDigest(m *CatalogMutation) *catalogMutationDigestV1 {
 	}
 	r := m.Record
 	return &catalogMutationDigestV1{OperationID: m.OperationID, Actor: m.Actor, Create: m.Create, ExpectedUID: m.ExpectedUID, ExpectedRevision: m.ExpectedRevision, ExpectedDependentsVersion: m.ExpectedDependentsVersion, Conditions: m.Conditions, Record: catalogRecordDigestV1{Key: r.Key, UID: r.UID, Revision: r.Revision, Generation: r.Generation, Purpose: r.Purpose, Payload: r.Payload, References: r.References, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, Removed: r.Removed, CommittedIndex: r.CommittedIndex, DependentsVersion: r.DependentsVersion}}
+}
+
+// Existing manual requests keep their original field order and digest. Rule
+// preconditions use a separate projection; adding a field here is a wire change.
+type manualRecoveryDigestV1 struct {
+	Revision                string                       `json:"revision,omitempty"`
+	MonitorUID              string                       `json:"monitor_uid"`
+	ExpectedControlRevision string                       `json:"expected_control_revision"`
+	OperationID             string                       `json:"operation_id"`
+	Actor                   string                       `json:"actor"`
+	Reason                  string                       `json:"reason"`
+	Limits                  runtimeconfig.ManualRecovery `json:"limits"`
+}
+
+func manualRecoveryProjectionV1(r *ManualRecoveryCommand) *manualRecoveryDigestV1 {
+	if r == nil {
+		return nil
+	}
+	return &manualRecoveryDigestV1{r.Revision, r.MonitorUID, r.ExpectedControlRevision, r.OperationID, r.Actor, r.Reason, r.Limits}
+}
+
+func recoveryRuleOperationDigest(c Command) ([]byte, error) {
+	r := c.ManualRecovery
+	if r == nil || r.RuleID == "" && r.ExpectedDecision == "" && r.ExpectedConfiguration == "" {
+		return json.Marshal(legacyOperationCommandDigest(c))
+	}
+	return json.Marshal(struct {
+		Format        string                   `json:"format"`
+		Command       operationCommandDigestV1 `json:"command"`
+		Rule          string                   `json:"rule"`
+		Decision      string                   `json:"decision"`
+		Configuration string                   `json:"configuration"`
+	}{"cpra/recovery-rules-operation/v1", legacyOperationCommandDigest(c), r.RuleID, r.ExpectedDecision, r.ExpectedConfiguration})
 }

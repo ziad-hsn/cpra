@@ -77,6 +77,77 @@ func TestA2AJobRequiresCommittedInvocation(t *testing.T) {
 	}
 }
 
+func TestA2ARecoveryFailureAuthorization(t *testing.T) {
+	for _, tc := range []struct {
+		name, trigger, reason string
+		attempt               int
+		allowed               bool
+	}{
+		{"old-limit", "recovery_exhausted", "", 2, true},
+		{"old-before-limit", "recovery_exhausted", "", 1, false},
+		{"attempt-limit", "recovery_exhausted", "attempt_limit", 2, true},
+		{"premature-attempt-limit", "recovery_exhausted", "attempt_limit", 1, false},
+		{"deadline", "recovery_exhausted", "execution_deadline", 1, true},
+		{"permanent-rejection", "recovery_exhausted", "permanent_rejection", 1, true},
+		{"first-failure", "recovery_failed", "", 1, true},
+		{"first-permanent-rejection", "recovery_failed", "permanent_rejection", 1, true},
+		{"unknown-is-not-failure", "recovery_exhausted", "outcome_unknown", 2, false},
+		{"unknown-is-not-first-failure", "recovery_failed", "outcome_unknown", 1, false},
+		{"unrecognized-reason", "recovery_exhausted", "provider-secret", 2, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var sends atomic.Int32
+			received := make(chan agentAction, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				sends.Add(1)
+				var request struct {
+					Message struct {
+						Parts []struct {
+							Data agentAction `json:"data"`
+						} `json:"parts"`
+					} `json:"message"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&request); err != nil || len(request.Message.Parts) != 2 {
+					t.Error("missing bounded agent context")
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				received <- request.Message.Parts[1].Data
+				writeA2AResponse(w, `{"message":{"messageId":"reply","role":"ROLE_AGENT","parts":[{"text":"accepted"}]}}`)
+			}))
+			defer server.Close()
+			d := testAgentDispatch(t, server, "code")
+			failedAt := time.Date(2026, 10, 23, 7, 0, 0, 123, time.FixedZone("fixture", 3*60*60))
+			d.RecoveryFailure = &RecoveryFailure{ActionID: "recovery", Driver: "docker", Attempt: tc.attempt, MaxAttempts: 2,
+				Trigger: tc.trigger, Outcome: "failure", FailedAt: failedAt, TerminationReason: tc.reason}
+			started, finished, receipts := 0, 0, 0
+			d.Authorize = func(context.Context) (ActionExecution, error) {
+				started++
+				return ActionExecution{Finish: func() error { finished++; return nil },
+					RecordAgentReceipt: func(context.Context, A2AReceipt) error { receipts++; return nil }}, nil
+			}
+			result := d.Execute()
+			if !tc.allowed {
+				if result.Err == nil || !result.ExecutionStart.IsZero() || sends.Load() != 0 || started != 0 || finished != 0 || receipts != 0 {
+					t.Fatal("invalid failure context reached committed start or the agent", result, sends.Load(), started, finished, receipts)
+				}
+				return
+			}
+			if result.Err != nil || result.ExecutionStart.IsZero() || sends.Load() != 1 || started != 1 || finished != 1 || receipts != 1 {
+				t.Fatal("confirmed failure was not delivered once", result, sends.Load(), started, finished, receipts)
+			}
+			got := <-received
+			if got.RecoveryFailure == nil || got.RecoveryFailure.TerminationReason != tc.reason ||
+				!got.RecoveryFailure.FailedAt.Equal(failedAt) || got.RecoveryFailure.FailedAt.Location() != time.UTC {
+				t.Fatal("agent failure context lost its reason, instant or UTC presentation", got.RecoveryFailure)
+			}
+			if d.RecoveryFailure.FailedAt != failedAt {
+				t.Fatal("wire projection changed the original failure timestamp")
+			}
+		})
+	}
+}
+
 func TestA2AJobOutcomesKeepAcceptanceSeparateFromCompletion(t *testing.T) {
 	for _, kind := range []string{"intervention", "code"} {
 		for _, state := range []string{"message", "TASK_STATE_COMPLETED", "TASK_STATE_SUBMITTED", "TASK_STATE_WORKING", "TASK_STATE_FAILED", "TASK_STATE_CANCELED", "TASK_STATE_REJECTED", "TASK_STATE_INPUT_REQUIRED", "TASK_STATE_AUTH_REQUIRED", "TASK_STATE_FUTURE"} {

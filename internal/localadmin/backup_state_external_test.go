@@ -13,7 +13,7 @@ import (
 )
 
 func TestStoppedBackupRecordsCommittedWorkerStateFormat(t *testing.T) {
-	testStoppedBackupStateFormat(t, persistence.WorkerNotificationConditionFormatVersion, func(t *testing.T, store *persistence.Store) {
+	testStoppedBackupStateFormat(t, persistence.WorkerDispatchFormatVersion, func(t *testing.T, store *persistence.Store) {
 		at := time.Now().UTC()
 		authority, err := store.ObserveOperatorAuthority(t.Context(), "oncall", at)
 		if err != nil {

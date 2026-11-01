@@ -1,4 +1,4 @@
-import type { Credential, Metadata, Monitor, NotificationEndpoint, NotificationGroup, Recipient } from './generated';
+import type { Credential, Metadata, Monitor, MonitorObservation, NotificationEndpoint, NotificationGroup, Recipient } from './generated';
 import { notificationFields, checkFields, recoveryFields, monitorShapes, operationContracts } from './generated';
 import { DashboardSession, ManagementError, type APIResponse } from './session';
 import { operationID, operationView } from './operations';
@@ -15,7 +15,7 @@ export const resourceKinds = {
 
 export type ResourceType = keyof typeof resourceKinds;
 export type ManagedResource = Monitor | Recipient | NotificationEndpoint | NotificationGroup | Credential;
-export type ResourceView = { resource: ManagedResource; unsupported?: string };
+export type ResourceView = { resource: ManagedResource; unsupported?: string; recoveryEditable?: boolean };
 export type ResourcePage = { items: ResourceView[]; nextCursor?: string; snapshot?: string };
 export type FieldDescriptor = { readonly key: string; readonly label: string; readonly type: string; readonly protected: boolean; readonly required: boolean };
 
@@ -71,10 +71,10 @@ export function driverView(source: Record<string, unknown>, category: DriverCate
   return { value: { type: driver, config, ...(source.credentialRefs !== undefined ? { credentialRefs: refs } : {}) }, unsupported };
 }
 
-type Shape = { $ref?: string; type?: string; properties?: Record<string, Shape>; additionalProperties?: Shape | boolean; items?: Shape; required?: readonly string[] };
+type Shape = { $ref?: string; type?: string; properties?: Record<string, Shape>; additionalProperties?: Shape | boolean; items?: Shape; required?: readonly string[]; enum?: readonly unknown[]; minimum?: number; maximum?: number };
 const shapes: Record<string, Shape> = monitorShapes;
 
-function monitorProjection(input: unknown, name: string): { value: Record<string, unknown>; unsupported?: string } {
+function monitorProjection(input: unknown, name: string, discardUnknown = false): { value: Record<string, unknown>; unsupported?: string } {
   let unsupported: string | undefined;
   const invalid = () => { unsupported ??= 'This monitor contains fields or values that this dashboard cannot edit safely. Supported observations remain available.'; };
   const project = (value: unknown, shape: Shape, path: string[]): unknown => {
@@ -95,7 +95,7 @@ function monitorProjection(input: unknown, name: string): { value: Record<string
       for (const required of shape.required ?? []) if (!Object.prototype.hasOwnProperty.call(value, required)) invalid();
       for (const [key, child] of Object.entries(value)) {
         const property = Object.prototype.hasOwnProperty.call(shape.properties ?? {}, key) ? shape.properties![key] : typeof shape.additionalProperties === 'object' ? shape.additionalProperties : undefined;
-        if (!property) { invalid(); continue; }
+        if (!property) { if (!discardUnknown) invalid(); continue; }
         // JSON object keys are data, including '__proto__'; never assign them
         // through an object's inherited setter while projecting server input.
         Object.defineProperty(result, key, { value: project(child, property, [...path, key]), enumerable: true, writable: true, configurable: true });
@@ -106,13 +106,25 @@ function monitorProjection(input: unknown, name: string): { value: Record<string
       if (!Array.isArray(value) || !shape.items) { invalid(); return []; }
       return value.map((item, index) => project(item, shape.items!, [...path, String(index)]));
     }
+    if (shape.enum && !shape.enum.includes(value)) { invalid(); return undefined; }
     if (shape.type === 'integer' || shape.type === 'number') {
-      if (typeof value === 'number' && (shape.type === 'integer' ? Number.isSafeInteger(value) : Number.isFinite(value))) return value;
+      if (typeof value === 'number' && (shape.type === 'integer' ? Number.isSafeInteger(value) : Number.isFinite(value)) && (shape.minimum === undefined || value >= shape.minimum) && (shape.maximum === undefined || value <= shape.maximum)) return value;
     } else if (typeof value === shape.type) return value;
     invalid(); return undefined;
   };
-  const value = project(input, shapes[name], []) as Record<string, unknown>;
+  const value = project(input, shapes[name], name === 'RecoverySpec' ? ['recovery'] : []) as Record<string, unknown>;
   return { value, unsupported };
+}
+
+/** Observation data has no editable catalog identity or resource version. */
+export async function getMonitorObservation(session: DashboardSession, id: string, signal?: AbortSignal): Promise<MonitorObservation> {
+  const raw = (await session.get<unknown>(`/api/v2/observations/monitors/${encodeURIComponent(id)}`, { signal })).data;
+  if (!object(raw) || raw.monitorID !== id || typeof raw.incarnationUID !== 'string') throw new ManagementError('invalid', 'The server returned a mismatched monitor observation.');
+  const projected = monitorProjection(raw, 'MonitorObservation', true);
+  // Keep only the canonical observation fields, including when an incompatible
+  // server echoes unrelated private fields. Never put its raw body in a cache.
+  if (projected.unsupported || typeof projected.value.health !== 'string' || !object(projected.value.lastCheckLatencyMs)) throw new ManagementError('invalid', 'The server returned an incomplete monitor observation.');
+  return projected.value as MonitorObservation;
 }
 
 /** Keep write-only values out of query caches even if an incompatible server echoes them. */
@@ -123,6 +135,7 @@ export function resourceView(value: unknown, type: ResourceType): ResourceView {
   const source = value.spec;
   const spec: Record<string, unknown> = {};
   let unsupported: string | undefined;
+  let recoveryEditable: boolean | undefined;
   if (value.apiVersion !== 'cpra.io/v2' || Object.keys(value.metadata).some(key => !['id', 'name', 'uid', 'resourceVersion', 'generation', 'labels'].includes(key))) {
     unsupported = 'This resource uses a version or metadata fields that this dashboard cannot edit safely.';
   }
@@ -141,6 +154,9 @@ export function resourceView(value: unknown, type: ResourceType): ResourceView {
     const parsed = monitorProjection(source, 'MonitorSpec');
     Object.assign(spec, parsed.value);
     unsupported = parsed.unsupported ?? unsupported;
+    // A recovery-only conditional patch never resubmits an unknown check or
+    // other concealed settings. Require a complete, understood recovery shape.
+    recoveryEditable = value.apiVersion === 'cpra.io/v2' && (source.recovery === undefined || !monitorProjection(source.recovery, 'RecoverySpec').unsupported);
   } else {
     const parsed = driverView(source, 'notification');
     Object.assign(spec, parsed.value);
@@ -156,7 +172,7 @@ export function resourceView(value: unknown, type: ResourceType): ResourceView {
   if (object(value.status)) for (const key of ['available', 'applied', 'observedGeneration'] as const) {
     if (typeof value.status[key] === 'boolean' || typeof value.status[key] === 'number') status[key] = value.status[key];
   }
-  return { resource: { apiVersion: typeof value.apiVersion === 'string' ? value.apiVersion : 'cpra.io/v2', kind: value.kind, metadata, spec, status } as ManagedResource, unsupported };
+  return { resource: { apiVersion: typeof value.apiVersion === 'string' ? value.apiVersion : 'cpra.io/v2', kind: value.kind, metadata, spec, status } as ManagedResource, unsupported, recoveryEditable };
 }
 
 export async function listResources(session: DashboardSession, type: ResourceType, cursor = '', signal?: AbortSignal): Promise<ResourcePage> {

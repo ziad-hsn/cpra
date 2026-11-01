@@ -1,0 +1,40 @@
+# Requires externaljobs in the server and client, runtime enablement and a
+# separately provisioned worker. These placeholders do not grant worker access.
+apiVersion: cpra.io/v2
+kind: JobType
+metadata:
+  id: cache-probe
+spec:
+  kind: check
+  version: v1
+  handler: cache-probe
+  protocolVersion: "2"
+  failureCodes: [custom.cache.full]
+  parameterSchema: {type: object, additionalProperties: false}
+  resultSchema: {type: object, additionalProperties: false}
+  timeout: 5s
+---
+apiVersion: cpra.io/v2
+kind: Monitor
+metadata:
+  id: cache
+spec:
+  enabled: false
+  check:
+    interval: 60s
+    timeout: 5s
+    unhealthyThreshold: 3
+    healthyThreshold: 2
+    driver:
+      type: external
+      config:
+        jobTypeID: cache-probe
+        version: v1
+        parameters: {}
+  recovery:
+    taxonomyVersion: "1"
+    maxAttempts: 1
+    rules:
+      - id: inspect-full-cache
+        match: {codes: [custom.cache.full]}
+        none: true

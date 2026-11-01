@@ -14,6 +14,8 @@ import (
 
 type runtimePreparationExtensions struct{}
 
+func (*RuntimePreparation) prepareRuleContracts(context.Context, *Catalog) error { return nil }
+
 func (*Catalog) notificationBudget(_ context.Context, config manifest.CodeNotification) (time.Duration, error) {
 	return jobs.NotificationConfigBudget(config), nil
 }

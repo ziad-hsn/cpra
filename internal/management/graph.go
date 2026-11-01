@@ -241,10 +241,10 @@ func resourceReferences(resource api.Resource, decode func([]byte, any) error) (
 		if err := addDriver(spec.Check.Driver); err != nil {
 			return nil, err
 		}
-		if spec.Recovery != nil {
-			if err := addDriver(spec.Recovery.Driver); err != nil {
-				return nil, err
-			}
+		if err := api.VisitRecoveryDrivers(spec.Recovery, func(_ string, driver *api.DriverConfig) error {
+			return addDriver(*driver)
+		}); err != nil {
+			return nil, err
 		}
 		if spec.NotificationGroupRefs != nil {
 			if err := add("NotificationGroup", (*spec.NotificationGroupRefs)...); err != nil {

@@ -48,6 +48,8 @@ type reply struct {
 // cancellation does not roll it back or make a new mutation safe to retry.
 var ErrCommitUnconfirmed = errors.New("durable commit outcome unknown")
 
+var errStateResponse = errors.New("invalid durable state machine response")
+
 type Store struct {
 	actionCompaction            *actionCompaction
 	lastActionCompactionAttempt time.Time
@@ -221,6 +223,9 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 		_ = s.Close()
 		return nil, err
 	}
+	// Replay and format migration are complete. Count only newly committed
+	// runtime transitions, including recovery of interrupted actions below.
+	s.fsm.actionMetrics.Store(&actionMetrics{})
 	s.maintenanceContext, s.cancelMaintenance = context.WithCancel(context.Background())
 	s.background.Add(1)
 	go s.maintain()
@@ -248,10 +253,10 @@ func openStore(ctx context.Context, config runtimeconfig.Config, administrative 
 // old logs or restoring a snapshot. Retained history remains authoritative.
 func logRecoveredActions(log applogger.Logger, events []Event) {
 	for _, event := range events {
-		if event.Type != "action_unknown" {
+		if event.Type != "action_unknown" && event.Type != "action_cancelled" {
 			continue
 		}
-		log.Warn("Interrupted action outcome is unknown; operator review required",
+		fields := []applogger.Field{
 			applogger.Field{Key: "event_type", Value: event.Type},
 			applogger.Field{Key: "monitor_id", Value: event.MonitorID},
 			applogger.Field{Key: "monitor_uid", Value: event.CatalogUID},
@@ -259,7 +264,15 @@ func logRecoveredActions(log applogger.Logger, events []Event) {
 			applogger.Field{Key: "action_id", Value: event.ActionID},
 			applogger.Field{Key: "action_kind", Value: event.Kind},
 			applogger.Field{Key: "delivery_id", Value: event.DeliveryID},
-			applogger.Field{Key: "endpoint_id", Value: event.EndpointID})
+			applogger.Field{Key: "endpoint_id", Value: event.EndpointID},
+			applogger.Field{Key: "outcome", Value: event.Outcome},
+			applogger.Field{Key: "observed_at", Value: event.At.UTC().Format(time.RFC3339Nano)},
+		}
+		if event.Type == "action_unknown" {
+			log.Warn("Interrupted action outcome is unknown; operator review required", fields...)
+		} else {
+			log.Info("Unstarted action cancelled during recovery", fields...)
+		}
 	}
 }
 
@@ -580,6 +593,10 @@ func (s *Store) run() {
 		}
 		data = append(data, ']', '}')
 		results, err := s.apply(data)
+		if err == nil && len(results) != count {
+			s.MarkUnavailable(errStateResponse)
+			err = errStateResponse
+		}
 		pos := 0
 		for _, req := range requests {
 			r := reply{err: err}
@@ -623,16 +640,23 @@ func (s *Store) apply(data []byte) ([]Result, error) {
 	}
 	s.mu.Lock()
 	s.lastCommit = time.Since(start)
-	if err != nil && !IsLeadershipUnavailable(err) {
+	// Raft's enqueue timeout occurs before applyCh accepts the command. It
+	// is bounded admission pressure, not a permanent log/FSM write failure.
+	if err != nil && !IsLeadershipUnavailable(err) && !errors.Is(err, raft.ErrEnqueueTimeout) {
 		s.err = err
 	}
 	s.mu.Unlock()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrCommitUnconfirmed, err)
 	}
+	return s.appliedResponse(response)
+}
+
+func (s *Store) appliedResponse(response any) ([]Result, error) {
 	results, ok := response.([]Result)
 	if !ok {
-		return nil, fmt.Errorf("%w: invalid state machine response", ErrCommitUnconfirmed)
+		s.MarkUnavailable(errStateResponse)
+		return nil, errStateResponse
 	}
 	return results, nil
 }

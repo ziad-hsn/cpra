@@ -67,6 +67,9 @@ func (c *CodeOpsgenieJob) deliverOpsgenie(ctx context.Context) error {
 	parsed, _ := url.Parse(base)
 	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/requests/" + receipt.RequestID
 	for {
+		if err := waitNotificationReceipt(ctx); err != nil {
+			return err
+		}
 		status, raw, err := c.opsgenieRequest(ctx, http.MethodGet, parsed.String(), nil)
 		if err != nil {
 			if ctx.Err() != nil {

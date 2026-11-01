@@ -85,6 +85,14 @@ func ValidateCapabilities(m *manifest.Monitor) error {
 			return err
 		}
 	}
+	for _, rule := range m.Intervention.Rules {
+		if rule.None {
+			continue
+		}
+		if err := ValidateDriver("recovery", rule.Action); err != nil {
+			return err
+		}
+	}
 	for _, code := range m.Codes {
 		if code.Notify != "" {
 			if err := ValidateDriver("notification", code.Notify); err != nil {

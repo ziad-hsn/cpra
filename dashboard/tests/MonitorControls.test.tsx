@@ -9,10 +9,14 @@ import { resource } from './managementFixture';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-async function controls(options: { reader?: boolean; conflict?: boolean; lost?: boolean; lostBody?: boolean; closed?: boolean; snoozed?: boolean; disabled?: boolean; recovery?: boolean; health?: string } = {}) {
+async function controls(options: { reader?: boolean; conflict?: boolean; lost?: boolean; lostBody?: boolean; closed?: boolean; snoozed?: boolean; disabled?: boolean; recovery?: boolean; rules?: boolean; health?: string } = {}) {
   const monitor = resource('monitors', 'checkout', { enabled: !options.disabled, check: { driver: { type: 'tcp', config: { host: 'checkout.example.test', port: 443 } }, interval: '60s', timeout: '5s' } });
   if (options.recovery) monitor.spec.recovery = { driver: { type: 'webhook', config: { url: 'https://recovery.example.test' } } };
   monitor.status = { controlRevision: 'control-1', incidentID: 'incident-1', health: options.health ?? 'unhealthy', ...(options.snoozed ? { snoozedUntil: '2099-01-01T00:00:00Z' } : {}) };
+  if (options.rules) {
+    monitor.spec.recovery = { taxonomyVersion: '1', rules: [{ id: 'refused', match: { codes: ['network.connection_refused'] }, driver: { type: 'webhook', config: { url: 'https://recovery.example.test' } } }] };
+    monitor.status.recoveryDecision = { candidateRuleID: 'refused', decisionRevision: 'decision-1', configurationRevision: 'config-1', taxonomyVersion: '1', qualifyingObservations: 3, requiredObservations: 3, reason: 'qualified' };
+  }
   const incident = { id: 'incident-1', monitorID: 'checkout', revision: 'attention-1', state: options.closed ? 'closed' : 'open', closedAt: options.closed ? '2026-09-01T00:00:00Z' : '0001-01-01T00:00:00Z', dismissed: false, acknowledgedBy: '', acknowledgedAt: '' };
   const writes: { method: string; path: string; match: string | null; body: Record<string, unknown> }[] = [];
   const permissions = Object.keys(operationContracts).filter(name => !options.reader || name.startsWith('Get') || name.startsWith('List'));
@@ -197,4 +201,16 @@ it.each([{ disabled: true }, { snoozed: true }, { health: 'healthy' }, { health:
   const { writes } = await controls({ recovery: true, ...option });
   expect(screen.getByRole('button', { name: 'Request recovery' })).toBeDisabled();
   expect(writes).toHaveLength(0);
+});
+
+it('freezes the qualified rule and configuration with the control revision', async () => {
+  const { writes, monitor } = await controls({ rules: true, conflict: true });
+  const dialog = await openDialog('Request recovery');
+  fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Reviewed this qualified error condition' } });
+  monitor.status!.recoveryDecision = { candidateRuleID: 'different', decisionRevision: 'decision-2', configurationRevision: 'config-2' };
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Request recovery' }));
+  await waitFor(() => expect(writes).toHaveLength(1));
+  expect(writes[0].body).toMatchObject({ ruleID: 'refused', decisionRevision: 'decision-1', configurationRevision: 'config-1', revision: 'control-1' });
+  expect(await screen.findByRole('alert')).toHaveTextContent('saved state changed');
+  expect(writes).toHaveLength(1);
 });

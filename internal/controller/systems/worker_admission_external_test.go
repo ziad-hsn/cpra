@@ -231,7 +231,7 @@ func TestWorkerAdmissionFullObservationCapacityStillExpiresActions(t *testing.T)
 	before := queuedExpiredWorkerActions(t, s)
 	retainWorkerCheckObservations(s, persistence.MaxWorkerExecutions)
 	for _, action := range before.Actions {
-		if !s.dispatchWorkerAction(s.entities[before.ID], action) {
+		if !s.dispatchWorkerAction(s.entities[before.ID], action, action.Endpoint) {
 			t.Fatal("worker action not recognized")
 		}
 	}

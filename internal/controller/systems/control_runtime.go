@@ -267,7 +267,7 @@ func (s *DurableSystem) finishExpiryWrite(ctx context.Context, p *ownerWrite) er
 		}
 		m := result.Monitor
 		if m == nil || m.ID != command.MonitorID || m.CatalogUID != command.Control.MonitorUID || m.ControlRevision != command.Control.Revision || !m.SnoozedUntil.IsZero() || m.Removed {
-			return persistence.ErrCommitUnconfirmed
+			return errOwnerProjection
 		}
 	}
 	for p.completed < len(p.results) {
@@ -303,6 +303,7 @@ func (s *DurableSystem) finishExpiryWrite(ctx context.Context, p *ownerWrite) er
 		}
 		if result.Monitor != nil {
 			m := *result.Monitor
+			s.logLifecycleEvents(result.Events, result.Monitor)
 			s.project(ent, m)
 			s.scheduleActions(ent, m)
 			if s.index != nil {

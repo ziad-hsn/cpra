@@ -449,13 +449,23 @@ func (s *IncidentsService) List(ctx context.Context, opts ListOptions) (*Respons
 	if err := opts.validate(); err != nil {
 		return nil, err
 	}
-	resp, err := s.c.generated.ListIncidents(ctx, &transport.ListIncidentsParams{Cursor: ptr(opts.Cursor), Limit: ptr(opts.limit()), Selector: ptr(opts.Selector), MonitorID: ptr(opts.MonitorID)})
+	if opts.IncidentState != "" && opts.IncidentState != "open" && opts.IncidentState != "pending" && opts.IncidentState != "closed" || opts.IncidentOrder != "" && opts.IncidentOrder != "triage" && opts.IncidentOrder != "id" {
+		return nil, errors.New("invalid incident state or ordering")
+	}
+	params := &transport.ListIncidentsParams{Cursor: ptr(opts.Cursor), Limit: ptr(opts.limit()), Selector: ptr(opts.Selector), MonitorID: ptr(opts.MonitorID), Acknowledged: opts.Acknowledged, Dismissed: opts.Dismissed}
+	if opts.IncidentState != "" {
+		params.State = ptr(opts.IncidentState)
+	}
+	if opts.IncidentOrder != "" {
+		params.Order = ptr(opts.IncidentOrder)
+	}
+	resp, err := s.c.generated.ListIncidents(ctx, params)
 	return response[api.IncidentList](s.c, resp, err, false)
 }
 
 // Iterate walks pages lazily.
 func (s *IncidentsService) Iterate(opts ListOptions) *Iterator[api.Incident] {
-	return &Iterator[api.Incident]{next: opts.Cursor, fetch: func(ctx context.Context, cursor string) ([]api.Incident, string, error) {
+	return &Iterator[api.Incident]{next: opts.Cursor, allowEmptyPages: true, fetch: func(ctx context.Context, cursor string) ([]api.Incident, string, error) {
 		opts.Cursor = cursor
 		r, e := s.List(ctx, opts)
 		if e != nil {

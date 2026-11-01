@@ -13,7 +13,7 @@ const NotificationConditionFormatVersion = 46
 const notificationConditionSnapshotMagic = "CPRA-COLLECTION-SNAPSHOT-46\n"
 
 func notificationConditionStorageFormat(version int) bool {
-	return version == NotificationConditionFormatVersion || version == 47 && externalStorageFormat(version)
+	return version == NotificationConditionFormatVersion || recoveryRulesStorageFormat(version) || version == 47 && externalStorageFormat(version)
 }
 
 func (m Monitor) notificationConditionsEnabled() bool {
@@ -38,10 +38,10 @@ func validateNotificationBudget(a Action, version int) error {
 	if a.ExecutionBudget == 0 {
 		return nil // Existing actions never acquire a new execution budget.
 	}
-	if !notificationConditionStorageFormat(version) || a.Kind != "code" || a.ExecutionBudget < 0 || a.ExecutionBudget > 24*time.Hour || a.QueuedAt.IsZero() {
+	if !notificationConditionStorageFormat(version) || a.Kind != "code" && !(a.Kind == "intervention" && dispatchStorageFormat(version)) || a.ExecutionBudget < 0 || a.ExecutionBudget > 24*time.Hour || a.QueuedAt.IsZero() {
 		return ErrNotificationIdentity
 	}
-	if a.Deadline.IsZero() && (a.State == Started || a.State == Succeeded || a.State == Failed || a.State == Unknown || a.Attempt > 1 || !a.StartedAt.IsZero()) {
+	if a.Deadline.IsZero() && (a.State == Started || a.State == Succeeded || a.State == Failed || a.State == Unknown || a.Kind == "code" && a.Attempt > 1 || !a.StartedAt.IsZero()) {
 		return ErrNotificationIdentity
 	}
 	return nil
@@ -51,6 +51,7 @@ func validateNotificationBudget(a Action, version int) error {
 // remains pending through suppression without keeping completed action history
 // in the monitor's execution projection.
 type NotificationResolution struct {
+	Binding                    string        `json:"binding,omitempty"`
 	DeliveryID                 string        `json:"delivery_id,omitempty"`
 	ProviderKey                string        `json:"provider_key,omitempty"`
 	MigrationReason            string        `json:"migration_reason,omitempty"`
@@ -201,7 +202,7 @@ func (m *Monitor) captureResolutionTargets(correlation, opening string, at time.
 		if _, exists := m.Notifications.Resolutions[id]; exists {
 			continue
 		}
-		m.Notifications.Resolutions[id] = NotificationResolution{ID: id, Revision: m.Revision, CatalogUID: m.CatalogUID,
+		m.Notifications.Resolutions[id] = NotificationResolution{Binding: m.resolutionBinding(endpoint), ID: id, Revision: m.Revision, CatalogUID: m.CatalogUID,
 			FileIncarnation: m.FileIncarnation, IncidentID: m.notificationIncident(), Correlation: correlation,
 			Episode: identity("resolved/" + correlation), EndpointID: endpointID, Endpoint: endpoint,
 			ProviderCorrelationVersion: providerVersion, Budget: m.Policy.notificationTimeout("green", endpoint), OpenedAt: at, OpeningActionID: opening}
@@ -228,8 +229,7 @@ func (m Monitor) resolutionEligible(a Action) bool {
 	}
 	v, ok := m.Notifications.Resolutions[a.Resolution.ConditionID]
 	return ok && v.ActionID == a.ID && !v.RecoveredAt.IsZero() && v.RecoveredAt.Equal(a.Resolution.RecoveredAt) &&
-		v.Revision == m.Revision && v.CatalogUID == m.CatalogUID && v.FileIncarnation == m.FileIncarnation &&
-		v.Endpoint < m.Policy.Endpoints["green"] && v.EndpointID == notificationEndpointIdentity(m, "green", v.Endpoint) &&
+		m.resolutionAuthorized(v) &&
 		a.NotificationCorrelation == v.Correlation && a.EndpointID == v.EndpointID && a.Resolution.Health == m.notificationHealth()
 }
 
@@ -241,7 +241,7 @@ func (m *Monitor) refreshQueuedNotificationHealth(health string, emit func(strin
 	}
 	for _, id := range sortedActions(m.Actions) {
 		a := m.Actions[id]
-		if a.State != Queued || !m.OwnsAction(a) || a.Revision != m.Revision {
+		if a.State != Queued || !m.OwnsAction(a) || !m.ActionConfigurationCurrent(a) {
 			continue
 		}
 		kind := ""
@@ -279,8 +279,7 @@ func (m *Monitor) cancelObsoleteResolutions(at time.Time, emit func(string, *Act
 		if v.MigrationReason != "" || v.State == Started || v.State == Unknown {
 			continue
 		}
-		if !m.Removed && v.Revision == m.Revision && v.CatalogUID == m.CatalogUID && v.FileIncarnation == m.FileIncarnation &&
-			v.Endpoint < m.Policy.Endpoints["green"] && v.EndpointID == notificationEndpointIdentity(*m, "green", v.Endpoint) {
+		if !m.Removed && m.resolutionAuthorized(v) {
 			continue
 		}
 		if v.State != Succeeded && v.State != Failed {
@@ -337,8 +336,7 @@ func (m *Monitor) assessNotificationResolutions(at time.Time, emit func(string, 
 				continue
 			}
 		}
-		if v.Revision != m.Revision || v.CatalogUID != m.CatalogUID || v.FileIncarnation != m.FileIncarnation ||
-			v.Endpoint >= m.Policy.Endpoints["green"] || v.EndpointID != notificationEndpointIdentity(*m, "green", v.Endpoint) {
+		if !m.resolutionAuthorized(v) {
 			v.Reason = "configuration_changed"
 			m.Notifications.Resolutions[id] = v
 			continue
@@ -394,6 +392,9 @@ func (m Monitor) validateResolutionConditions(version int) error {
 		return ErrNotificationIdentity
 	}
 	for id, v := range m.Notifications.Resolutions {
+		if v.Binding != "" && (!dispatchStorageFormat(version) || len(v.Binding) != 64 || !catalogIdentifier(v.Binding, 64)) {
+			return ErrNotificationIdentity
+		}
 		if !validNotificationReason(v.MigrationReason) || v.ProviderKey != "" && !validHistoricalProviderKey(v.ProviderKey) || id != v.ID || !catalogIdentifier(id, 256) || v.Revision == "" || len(v.Revision) > 512 ||
 			!catalogIdentifier(v.Correlation, 256) || !catalogIdentifier(v.Episode, 256) || !catalogIdentifier(v.EndpointID, 256) ||
 			v.Endpoint < 0 || v.OpenedAt.IsZero() || !v.RecoveredAt.IsZero() && v.RecoveredAt.Before(v.OpenedAt) ||

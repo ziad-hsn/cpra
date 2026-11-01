@@ -18,6 +18,7 @@ import (
 	"time"
 
 	cpra "github.com/ziad-hsn/cpra/sdk/go"
+	"github.com/ziad-hsn/cpra/sdk/go/collection"
 )
 
 // The real file chooser, embedded parser, public API and normal controller own
@@ -136,7 +137,7 @@ func TestMainManagementCollectionActivationBrowser(t *testing.T) {
 		t.Fatal("restart changed the guided notification configuration", err)
 	}
 	after, err := restarted.Operations.ExecutionResult(ctx, report.OperationID, cpra.ExecutionResultPageOptions{})
-	if err != nil || before.Data.NormalizationProfile != "cpra.file.base.v3" || after.Data.NormalizationProfile != before.Data.NormalizationProfile || !reflect.DeepEqual(before.Data.ExecutionResult, after.Data.ExecutionResult) || !reflect.DeepEqual(before.Data.Items, after.Data.Items) {
+	if err != nil || before.Data.NormalizationProfile != collection.FileNormalizationProfile || after.Data.NormalizationProfile != before.Data.NormalizationProfile || !reflect.DeepEqual(before.Data.ExecutionResult, after.Data.ExecutionResult) || !reflect.DeepEqual(before.Data.Items, after.Data.Items) {
 		t.Fatal("restart changed the original public activation result", err)
 	}
 	repeated, err := restarted.Operations.Activate(ctx, report.OperationID)

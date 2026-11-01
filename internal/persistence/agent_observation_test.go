@@ -256,7 +256,7 @@ func TestAgentConnectionSnapshotAndReadsAreDetached(t *testing.T) {
 	}
 	defer ledger.Close()
 	retained := snapshotAction(t, ledger, a.ID)
-	if image.Version != ActionFormatVersion || retained.AgentReceipt.State != "TASK_STATE_WORKING" {
+	if image.Version != DispatchFormatVersion || retained.AgentReceipt.State != "TASK_STATE_WORKING" {
 		t.Fatal("snapshot was not frozen before the later observation")
 	}
 	plain, err := agentObservationSealer(t).Open(t.Context(), AgentConnectionBinding(s.Status().NodeID, a.MonitorID, retained), retained.AgentConnection.Payload)

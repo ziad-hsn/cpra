@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import time
@@ -31,6 +32,25 @@ SCREENSHOTS = (
 )
 MAX_LINE_BYTES = 1024 * 1024
 MAX_LOG_BYTES = 64 * 1024 * 1024
+FAILURE_SOURCES = {
+    ("github.com/ziad-hsn/cpra", "TestMainManagementRecoveryReviewBrowser"): {
+        "main_actions_browser_test.go", "verify_actions_browser.cjs",
+    },
+}
+
+
+def failure_location(event):
+    """Extract source coordinates only; fixture output remains private."""
+    sources = FAILURE_SOURCES.get((event.get("Package"), event.get("Test")))
+    if event.get("Action") != "output" or not sources:
+        return None
+    output = event.get("Output", "").strip()
+    match = re.fullmatch(r"CPRA_BROWSER_FAILURE ([a-z_]+\.cjs):([1-9][0-9]{0,4})", output)
+    if not match:
+        match = re.match(r"([a-z_]+_test\.go):([1-9][0-9]{0,4}):", output)
+    if not match or match[1] not in sources:
+        return None
+    return {"test": event["Test"], "file": match[1], "line": int(match[2])}
 
 
 def verify_results(events):
@@ -137,6 +157,14 @@ def public_summary(report):
         if any(event.get("Package") == package and event.get("Test") is None
                and event.get("Action") in ("fail", "skip") for event in events)
     ]
+    summary["failure_locations"] = [
+        location for location in report.get("failure_locations", [])[:10]
+        if isinstance(location, dict) and set(location) == {"test", "file", "line"}
+        and location.get("test") in summary["failed_tests"]
+        and any(location.get("test") == test and location.get("file") in sources
+                for (_, test), sources in FAILURE_SOURCES.items())
+        and type(location.get("line")) is int and 0 < location["line"] < 100000
+    ]
     return summary
 
 
@@ -197,7 +225,7 @@ def campaign(args, root=ROOT, *, source_files=None, source_commit=None, environm
             command += [".", "./internal/httpserver"]
             report["command"] = command
             write_report(stream, report)
-            events, invalid, total = [], None, 0
+            events, locations, invalid, total = [], [], None, 0
             log_path, error_path = artifacts / "go.jsonl", artifacts / "stderr.log"
             with log_path.open("xb") as log, error_path.open("xb") as errors:
                 with subprocess.Popen(command, cwd=root, env=environment, stdout=subprocess.PIPE, stderr=errors) as process:
@@ -219,8 +247,11 @@ def campaign(args, root=ROOT, *, source_files=None, source_commit=None, environm
                             continue
                         if event["Action"] in ("pass", "fail", "skip"):
                             events.append(event)
+                        location = failure_location(event)
+                        if location and location not in locations and len(locations) < 10:
+                            locations.append(location)
                     returncode = process.wait()
-            report.update(exit_code=returncode, test_results=events,
+            report.update(exit_code=returncode, test_results=events, failure_locations=locations,
                           logs={str(path.relative_to(output.parent)): {"bytes": path.stat().st_size, "sha256": sha(path)} for path in (log_path, error_path)})
             after = source_inventory(root, source_files)
             report["source_changed"] = [name for name in sorted(set(before) | set(after)) if before.get(name) != after.get(name)]

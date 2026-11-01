@@ -71,6 +71,25 @@ class BrowserCampaignTests(unittest.TestCase):
         for name in ('NODE_OPTIONS', 'CPRA_TOKEN', 'GH_TOKEN'):
             self.assertNotIn(name, env)
 
+    def test_failure_location_excludes_fixture_content_and_unregistered_sources(self):
+        event = {'Action': 'output', 'Package': 'github.com/ziad-hsn/cpra',
+                 'Test': 'TestMainManagementRecoveryReviewBrowser'}
+        for output, source, line in (
+            ('CPRA_BROWSER_FAILURE verify_actions_browser.cjs:314\n', 'verify_actions_browser.cjs', 314),
+            ('    main_actions_browser_test.go:152: private-fixture-marker\n', 'main_actions_browser_test.go', 152),
+        ):
+            result = browser_campaign.failure_location(dict(event, Output=output))
+            self.assertEqual(result, {'test': event['Test'], 'file': source, 'line': line})
+            self.assertNotIn('private-fixture-marker', json.dumps(result))
+        for output in ('CPRA_BROWSER_FAILURE secret-marker.cjs:12',
+                       'CPRA_BROWSER_FAILURE verify_actions_browser.cjs:0',
+                       'CPRA_BROWSER_FAILURE verify_actions_browser.cjs:123456',
+                       'CPRA_BROWSER_FAILURE verify_actions_browser.cjs:314 private-fixture-marker',
+                       '/private/path/main_actions_browser_test.go:152: private-fixture-marker'):
+            self.assertIsNone(browser_campaign.failure_location(dict(event, Output=output)))
+        for replacement in ({'Test': 'unregistered'}, {'Package': 'unregistered'}, {'Action': 'fail'}):
+            self.assertIsNone(browser_campaign.failure_location(dict(event, Output='CPRA_BROWSER_FAILURE verify_actions_browser.cjs:314', **replacement)))
+
     def test_explicit_frozen_environment_does_not_inherit_developer_workspace(self):
         with patch.dict(os.environ, {'GOWORK': '/developer/work', 'GOMODCACHE': '/developer/cache'}):
             env = browser_campaign.build_environment(Path('/module'), '/node', Path('/chrome'), Path('/screens'),
@@ -230,6 +249,26 @@ class RecordedCampaignTests(unittest.TestCase):
         report = self.run_campaign()
         self.assertEqual(report['result'], 'failed')
         self.assertIn('did not pass', report['error'])
+
+    def test_failure_locations_are_bounded_and_only_published_for_failed_tests(self):
+        name = 'TestMainManagementRecoveryReviewBrowser'
+        output = {'Action': 'output', 'Package': 'github.com/ziad-hsn/cpra', 'Test': name}
+        self.events = [dict(output, Output=f'CPRA_BROWSER_FAILURE verify_actions_browser.cjs:{line}\n')
+                       for line in range(10, 30)] + self.events
+        next(event for event in self.events if event.get('Test') == name and event['Action'] == 'pass')['Action'] = 'fail'
+        self.exit_code = 1
+        report = self.run_campaign()
+        self.assertEqual(len(report['failure_locations']), 10)
+        summary = browser_campaign.public_summary(report)
+        self.assertEqual(summary['failure_locations'], report['failure_locations'])
+        report['failure_locations'] = [dict(report['failure_locations'][0], file='private-marker'),
+                                       dict(report['failure_locations'][0], line='private-marker'),
+                                       dict(report['failure_locations'][0], output='private-marker')]
+        self.assertEqual(browser_campaign.public_summary(report)['failure_locations'], [])
+        report['failure_locations'] = summary['failure_locations']
+        for event in report['test_results']:
+            event['Action'] = 'pass'
+        self.assertEqual(browser_campaign.public_summary(report)['failure_locations'], [])
 
     def test_invalid_json_line_cannot_disappear(self):
         self.raw = b'"logger output"\n'+b''.join(json.dumps(event).encode()+b'\n' for event in self.events)

@@ -223,7 +223,8 @@ function check(value, message) { if (!value) throw new Error(message); }
     const incidentRegion = page.getByRole('region', { name: 'Latest incident page', exact: true });
     await incidentRegion.getByRole('link', { name: 'browser-recovery', exact: true }).waitFor();
     check((await page.getByLabel('Incident page counts', { exact: true }).textContent()).includes('page counts, not fleet totals'), 'incident page counts implied fleet totals');
-    check(!(await incidentRegion.textContent()).includes('0001'), 'Go zero incident timestamps appeared as actual observations');
+    const incidentTimes = incidentRegion.locator('tbody tr td:nth-child(4), tbody tr td:nth-child(5), tbody tr td:nth-child(6), tbody tr td:nth-child(9)');
+    check((await incidentTimes.allTextContents()).every(value => !value.includes('0001')), 'Go zero incident timestamps appeared as actual observations');
     await page.screenshot({ path: path.join(process.env.CPRA_BROWSER_EVIDENCE_DIR, 'reader-incidents.png'), fullPage: true });
     await auditAccessibility(page, 'reader-incidents', accessibility);
     await incidentRegion.getByRole('link', { name: 'browser-recovery', exact: true }).click();
@@ -303,11 +304,25 @@ function check(value, message) { if (!value) throw new Error(message); }
     const initialCell = await cellBounds();
     check(initialCell.cellWidth <= initialCell.regionWidth, 'Incident identifier does not reflow within the mobile table region');
     let scrolledCell = initialCell;
+    async function waitForKeyboardScroll(before) {
+      const deadline = performance.now() + 5000;
+      let previous = before, lastMovement = performance.now();
+      do {
+        await page.waitForTimeout(25);
+        const current = await cellBounds();
+        check(current.focused, 'Incident region lost keyboard focus while scrolling');
+        if (current.scrollLeft !== previous.scrollLeft) lastMovement = performance.now();
+        // Observe movement and its completion instead of assuming that a
+        // native smooth-scroll animation has advanced within one 25 ms frame.
+        if (current.scrollLeft > before.scrollLeft && performance.now() - lastMovement >= 100) return current;
+        previous = current;
+      } while (performance.now() < deadline);
+      throw new Error('Incident region did not complete keyboard scrolling within five seconds');
+    }
     // Reflow may already make the whole cell visible; still exercise scrolling.
     for (let presses = 0; presses < 80 && (presses === 0 || scrolledCell.cellRight > scrolledCell.regionRight); presses++) {
       await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(25);
-      scrolledCell = await cellBounds();
+      scrolledCell = await waitForKeyboardScroll(scrolledCell);
     }
     check(scrolledCell.focused && scrolledCell.scrollLeft > initialCell.scrollLeft, 'Focused incident region did not scroll with the keyboard');
     check(scrolledCell.cellRight <= scrolledCell.regionRight + 1, 'Keyboard scrolling could not reach the incident cell');
@@ -364,4 +379,13 @@ function check(value, message) { if (!value) throw new Error(message); }
     console.log(JSON.stringify({ scope: 'normal main, embedded SPA, TLS, encrypted Raft, actual local HTTP/webhook targets; no production-account certification', browser: browser.version(), node: process.version, playwright: require(`${process.env.CPRA_BROWSER_MODULE}/package.json`).version, checkpoints, writes, metricsRequests, keyboardSteps, accessibility }));
     await context.close();
   } finally { await browser.close(); }
-})().catch(error => { console.error(error.message); process.exitCode = 1; });
+})().catch(error => {
+  // Keep the detailed error in private campaign evidence. The public summary
+  // accepts only this fixed source name and a bounded source line, never the
+  // message, URL, response body, DOM or fixture configuration.
+  const frames = String(error.stack ?? '').split('\n').filter(frame => !/^\s+at check \(/.test(frame));
+  const location = frames.join('\n').match(/\bverify_actions_browser\.cjs:(\d{1,5}):\d+\b/);
+  if (location) console.error(`CPRA_BROWSER_FAILURE verify_actions_browser.cjs:${location[1]}`);
+  console.error(error.message);
+  process.exitCode = 1;
+});

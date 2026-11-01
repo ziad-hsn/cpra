@@ -126,7 +126,8 @@ jobs:
           go test -race -count=1 -timeout=4m -run '^TestA2AVerification' ./internal/drivertest
           python3 -B -m unittest discover -s scripts/verification -p 'test_*.py'
   dashboard:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 supports Ubuntu 24.04; do not inherit a newer OS rollout.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install checksum-pinned parser compiler

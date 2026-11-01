@@ -38,6 +38,11 @@ func TestWorkerHeartbeatControlAndIgnoreRecoveryNotices(t *testing.T) {
 			}
 			in.ActionID, in.ControlRevision, in.Scheduled = action.ID, m.ControlRevision, action.NotBefore
 			in.Deadline = action.Deadline
+			in.ExecutionBudget = action.ExecutionBudget
+			in.Notification = NotificationForWorker(action)
+			if in.ExecutionBudget <= 0 || !in.Deadline.IsZero() {
+				t.Fatal("new notice must retain its budget until the first committed start")
+			}
 			if _, err := s.CommitWorkerExecution(t.Context(), in); err != nil {
 				t.Fatal("notice admission", err)
 			}

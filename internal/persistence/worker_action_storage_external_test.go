@@ -95,8 +95,11 @@ func TestWorkerUnknownReceiptRequiresRetainedActionOnNativeImport(t *testing.T) 
 				}
 				// Bypass producer validation to exercise the native import boundary
 				// with an internally checksummed but semantically damaged snapshot.
+				if snap.image.Version != WorkerDispatchFormatVersion {
+					t.Fatal("fixture must encode the current worker snapshot format")
+				}
 				var raw bytes.Buffer
-				raw.WriteString(workerRecoveryRulesSnapshotMagic)
+				raw.WriteString(workerDispatchSnapshotMagic)
 				if err := json.NewEncoder(&raw).Encode(snap.image); err != nil {
 					t.Fatal(err)
 				}

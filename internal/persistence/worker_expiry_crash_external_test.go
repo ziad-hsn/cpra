@@ -136,6 +136,12 @@ func TestWorkerExpirySurvivesProcessKill(t *testing.T) {
 				}
 				expected.InstallationID = identity("installation/" + admin.nodeID)
 				if category == "recovery" && phase == "before" {
+					// Recovering a still-queued action upgrades the monitor's dispatch
+					// semantics, while the original action and absolute deadline stay intact.
+					if expected.ActionVersion != ActionFormatVersion {
+						t.Fatal("fixture must retain the historical action state version")
+					}
+					expected.ActionVersion = DispatchFormatVersion
 					if m.RecoveryCheckAfter.Before(openedAt) || m.RecoveryCheckAfter.After(time.Now().UTC()) {
 						t.Fatal("restart did not require a fresh check for the queued recovery")
 					}

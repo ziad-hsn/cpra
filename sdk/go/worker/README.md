@@ -60,11 +60,14 @@ Use resolved absolute paths for both the state directory and wrapping key:
 neither the final component nor any ancestor may be a symbolic link. On macOS,
 for example, resolve a `/var/...` path to its actual `/private/var/...` location
 before configuring the worker. The state path must be owned by the service
-identity, mode `0700` on Unix; the key must be `0600`. On Windows, the state/key
-DACL may grant access only to
-the process identity and SYSTEM. The library creates a protected inheritable
-Windows state-directory DACL and checks existing ownership/access rules. Native
-Windows qualification is separate from cross compilation.
+identity, mode `0700` on Unix; the key must be `0600`. On Windows, the state and
+key must be owned by the worker's process user, and their DACLs may grant access
+only to that user and SYSTEM. An elevated account's default object owner can be
+a group, so key provisioning must explicitly select the intended worker user as
+owner. The library sets that owner and a protected DACL when creating its state
+directory, journal and conversion backup. It validates existing objects without
+changing their ownership or permissions. Native Windows qualification is
+separate from cross compilation.
 
 The key protects a data-key envelope, encrypted results, and replay metadata. It
 is never generated or replaced automatically. Back up the **stopped complete

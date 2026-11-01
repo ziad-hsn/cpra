@@ -229,7 +229,11 @@ func TestManagementOperationListAppliesSharedSnapshotByteBudget(t *testing.T) {
 	// Fill the accounting boundary without allocating tens of MiB in a unit
 	// fixture. The next HTTP call still uses the real durable snapshot budget.
 	m.snapshots["principal-quota-fixture"] = managementSnapshot{principal: "operator", generation: generation, expires: time.Now().Add(time.Minute), operationBytes: managementPrincipalOperationBytes - cost}
+	// Protect the actual view with an admitted reader; otherwise reclaiming it
+	// is the expected response to pressure rather than a quota violation.
+	activity := m.retainCursorRead(page.Data.Snapshot, m.snapshots[page.Data.Snapshot], m.now().UTC())
 	m.mu.Unlock()
+	defer m.releaseCursorRead(page.Data.Snapshot, activity)
 	response, _ := f.request(t, "GET", "/api/v2/operations?limit=1", managementOperatorToken, nil, nil)
 	if response.StatusCode != 429 {
 		t.Fatal("principal aggregate byte quota bypassed")

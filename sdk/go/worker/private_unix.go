@@ -10,6 +10,10 @@ import (
 
 func makePrivateDir(path string) error { return os.MkdirAll(path, 0700) }
 
+func createPrivateFile(path string) (*os.File, error) {
+	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+}
+
 func checkPrivate(path string, directory bool) error {
 	info, err := os.Lstat(path)
 	if err != nil {

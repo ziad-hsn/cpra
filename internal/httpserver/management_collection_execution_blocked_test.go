@@ -217,7 +217,11 @@ func TestCollectionExecutionHTTPSharedSnapshotQuotas(t *testing.T) {
 	}
 	m.snapshots["byte-quota-fixture"] = managementSnapshot{principal: entry.principal, generation: entry.generation, expires: entry.expires,
 		operationBytes: managementPrincipalOperationBytes - entry.operationBytes}
+	// An admitted reader protects this real view from capacity reclamation.
+	// Inactive-view reclamation is covered by the cursor pressure regressions.
+	activity := m.retainCursorRead(cursor.View, entry, m.now().UTC())
 	m.mu.Unlock()
+	defer m.releaseCursorRead(cursor.View, activity)
 	response := validationReadWait(t, validationAsyncRead(f, t.Context(), "/api/v2/operations/"+head.ID+"?limit=1"))
 	if response.err != nil || response.status != 429 || response.problem.Code != "snapshotByteQuota" {
 		t.Fatal("execution cursor bypassed byte quota", response)

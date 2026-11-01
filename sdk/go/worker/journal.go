@@ -177,7 +177,7 @@ func openJournalContext(ctx context.Context, c Config, format int, conversion bo
 		}
 		// Own first creation explicitly. A crash before initialization leaves an
 		// existing empty file which is rejected, never silently bootstrapped.
-		file, createErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		file, createErr := createPrivateFile(path)
 		if createErr != nil {
 			return nil, fmt.Errorf("create worker journal: %w", createErr)
 		}

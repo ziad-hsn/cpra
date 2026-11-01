@@ -210,6 +210,21 @@ class RecordedCampaignTests(unittest.TestCase):
         self.assertEqual(len(report['logs']), 2)
         self.assertTrue((self.root/'report.artifacts/go.jsonl').is_file())
 
+    def test_public_failure_summary_uses_only_registered_test_identities(self):
+        self.exit_code = 1
+        self.events[0]['Action'] = 'fail'
+        report = self.run_campaign()
+        report['test_results'] += [
+            {'Package': 'github.com/ziad-hsn/cpra', 'Test': 'secret-marker', 'Action': 'fail'},
+            {'Package': 'secret-marker', 'Action': 'fail'},
+            {'Package': 'github.com/ziad-hsn/cpra', 'Action': 'fail', 'Output': 'secret-marker'},
+        ]
+        report['logs']['secret-marker'] = {'sha256': 'secret-marker'}
+        summary = browser_campaign.public_summary(report)
+        self.assertEqual(summary['failed_tests'], [browser_campaign.TESTS['github.com/ziad-hsn/cpra'][0]])
+        self.assertEqual(summary['failed_packages'], ['github.com/ziad-hsn/cpra'])
+        self.assertNotIn('secret-marker', json.dumps(summary))
+
     def test_skipped_required_test_is_retained_as_failure(self):
         self.events[0]['Action'] = 'skip'
         report = self.run_campaign()

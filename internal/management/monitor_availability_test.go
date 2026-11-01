@@ -41,17 +41,26 @@ func TestMonitorAvailabilityRequiresMatchingOwnerProjection(t *testing.T) {
 	index := fleetview.NewIndex(nil)
 	holder.SetIndex(index)
 	c.SetObservations(holder)
-	row := fleetview.MonitorSummary{MonitorID: m.ID, IncarnationUID: m.IncarnationID(), ConfigurationRevision: m.Revision, ControlRevision: m.ControlRevision, StateGeneration: m.Generation, IncidentID: m.IncidentID, IncidentRevision: m.IncidentRevision, Health: "healthy", Availability: fleetview.MonitorAvailability{State: "available", ObservedAt: at}, Maintenance: true, NotificationsSuppressed: true, SuppressionObservedAt: at}
+	row := fleetview.MonitorSummary{MonitorID: m.ID, IncarnationUID: m.IncarnationID(), CatalogRevision: r.Metadata.ResourceVersion, ConfigurationRevision: m.Revision, ControlRevision: m.ControlRevision, StateGeneration: m.Generation, IncidentID: m.IncidentID, IncidentRevision: m.IncidentRevision, Health: "healthy", Availability: fleetview.MonitorAvailability{State: "available", ObservedAt: at}, Maintenance: true, NotificationsSuppressed: true, SuppressionObservedAt: at}
 	index.Put(row)
+	status = read()
+	if status.Health != "unknown" || status.Availability.State != "unavailable" {
+		t.Fatal("unacknowledged owner projection was published", status)
+	}
+	if err := store.MarkMonitorObserved(m.ID, *guard, uint64(r.Metadata.Generation)); err != nil {
+		t.Fatal(err)
+	}
 	status = read()
 	if status.Health != "healthy" || status.Availability.State != "available" || status.Maintenance == nil || !*status.Maintenance || status.NotificationsSuppressed == nil || !*status.NotificationsSuppressed {
 		t.Fatal("matching owner projection not published", status)
 	}
-	for _, field := range []string{"incarnation", "configuration", "control", "state", "incident", "incident revision"} {
+	for _, field := range []string{"incarnation", "catalog", "configuration", "control", "state", "incident", "incident revision"} {
 		changed := row
 		switch field {
 		case "incarnation":
 			changed.IncarnationUID = "another-owner"
+		case "catalog":
+			changed.CatalogRevision = "another-catalog-revision"
 		case "configuration":
 			changed.ConfigurationRevision = "another-configuration"
 		case "control":
@@ -89,8 +98,11 @@ func TestMonitorAvailabilityWaitsForDismissAndReopenProjection(t *testing.T) {
 	index := fleetview.NewIndex(nil)
 	holder.SetIndex(index)
 	c.SetObservations(holder)
-	row := fleetview.MonitorSummary{MonitorID: m.ID, IncarnationUID: m.IncarnationID(), ConfigurationRevision: m.Revision, ControlRevision: m.ControlRevision, StateGeneration: m.Generation, IncidentID: m.IncidentID, IncidentRevision: m.IncidentRevision, Health: "unhealthy", Availability: fleetview.MonitorAvailability{State: "available", ObservedAt: at}, SuppressionObservedAt: at}
+	row := fleetview.MonitorSummary{MonitorID: m.ID, IncarnationUID: m.IncarnationID(), CatalogRevision: r.Metadata.ResourceVersion, ConfigurationRevision: m.Revision, ControlRevision: m.ControlRevision, StateGeneration: m.Generation, IncidentID: m.IncidentID, IncidentRevision: m.IncidentRevision, Health: "unhealthy", Availability: fleetview.MonitorAvailability{State: "available", ObservedAt: at}, SuppressionObservedAt: at}
 	index.Put(row)
+	if err := store.MarkMonitorObserved(m.ID, *guard, uint64(r.Metadata.Generation)); err != nil {
+		t.Fatal(err)
+	}
 	read := func() api.MonitorStatus {
 		t.Helper()
 		out, err := c.Get(t.Context(), "Monitor", m.ID)

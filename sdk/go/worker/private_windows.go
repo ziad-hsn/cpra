@@ -20,11 +20,7 @@ func makePrivateDir(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
-	user, err := windows.GetCurrentProcessToken().GetTokenUser()
-	if err != nil {
-		return err
-	}
-	sd, err := windows.SecurityDescriptorFromString("D:P(A;OICI;FA;;;" + user.User.Sid.String() + ")(A;OICI;FA;;;SY)")
+	sd, err := privateSecurityDescriptor(true)
 	if err != nil {
 		return err
 	}
@@ -38,6 +34,40 @@ func makePrivateDir(path string) error {
 		return checkPrivate(path, true)
 	}
 	return err
+}
+
+func privateSecurityDescriptor(directory bool) (*windows.SECURITY_DESCRIPTOR, error) {
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return nil, err
+	}
+	inherit := ""
+	if directory {
+		inherit = "OICI"
+	}
+	sid := user.User.Sid.String()
+	// TokenOwner can be a group on elevated processes. Creation must select
+	// TokenUser explicitly rather than weakening validation of existing files.
+	return windows.SecurityDescriptorFromString("O:" + sid + "D:P(A;" + inherit + ";FA;;;" + sid + ")(A;" + inherit + ";FA;;;SY)")
+}
+
+func createPrivateFile(path string) (*os.File, error) {
+	sd, err := privateSecurityDescriptor(false)
+	if err != nil {
+		return nil, err
+	}
+	name, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return nil, err
+	}
+	sa := windows.SecurityAttributes{Length: uint32(unsafe.Sizeof(windows.SecurityAttributes{})), SecurityDescriptor: sd}
+	handle, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, &sa, windows.CREATE_NEW,
+		windows.FILE_ATTRIBUTE_NORMAL|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	if err != nil {
+		return nil, &os.PathError{Op: "create", Path: path, Err: err}
+	}
+	return os.NewFile(uintptr(handle), path), nil
 }
 
 func checkPrivate(path string, directory bool) error {

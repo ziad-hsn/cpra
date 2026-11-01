@@ -61,7 +61,7 @@ func ConvertJournal(ctx context.Context, config Config) (backupPath string, err 
 		return backupPath, err
 	}
 	temporary := backupPath + ".partial-" + randomID()
-	backup, err := os.OpenFile(temporary, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	backup, err := createPrivateFile(temporary)
 	if err != nil {
 		return "", fmt.Errorf("create original worker journal backup: %w", err)
 	}

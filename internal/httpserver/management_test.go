@@ -341,10 +341,21 @@ func TestManagementFrozenPaginationAndAdmissionBounds(t *testing.T) {
 			t.Fatalf("quota early at %d", i)
 		}
 	}
-	response, _ = f.request(t, "GET", "/api/v2/notification-endpoints?limit=1", managementOperatorToken, nil, nil)
-	if response.StatusCode != 429 {
-		t.Fatal("snapshot quota unbounded")
+	response, raw = f.request(t, "GET", "/api/v2/notification-endpoints?limit=1", managementOperatorToken, nil, nil)
+	if response.StatusCode != 200 || json.Unmarshal(raw, &first) != nil || first.NextCursor == "" {
+		t.Fatal("inactive cursor capacity was not reclaimed")
 	}
+	f.server.managementHTTP.mu.Lock()
+	retained := len(f.server.managementHTTP.snapshots)
+	f.server.managementHTTP.mu.Unlock()
+	if retained != managementPrincipalSnapshots {
+		t.Fatal("snapshot quota unbounded", retained)
+	}
+	response, _ = f.request(t, "GET", pagePath, managementOperatorToken, nil, nil)
+	if response.StatusCode != 410 {
+		t.Fatal("evicted cursor was reconstructed")
+	}
+	pagePath = "/api/v2/notification-endpoints?cursor=" + url.QueryEscape(first.NextCursor)
 	if err := f.server.cfg.ManagementAuth.Replace(f.authConfig); err != nil {
 		t.Fatal(err)
 	}

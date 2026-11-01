@@ -123,6 +123,23 @@ def write_report(stream, report):
     os.fsync(stream.fileno())
 
 
+def public_summary(report):
+    """Identify failed coverage without publishing fixture output or artifacts."""
+    summary = {key: report[key] for key in ("result", "seconds", "error") if key in report}
+    events = report.get("test_results", [])
+    summary["failed_tests"] = [
+        name for package, names in TESTS.items() for name in names
+        if any(event.get("Package") == package and event.get("Test") == name
+               and event.get("Action") in ("fail", "skip") for event in events)
+    ]
+    summary["failed_packages"] = [
+        package for package in TESTS
+        if any(event.get("Package") == package and event.get("Test") is None
+               and event.get("Action") in ("fail", "skip") for event in events)
+    ]
+    return summary
+
+
 def campaign(args, root=ROOT, *, source_files=None, source_commit=None, environment=None):
     output = args.out.resolve()
     artifacts = output.with_name(output.stem + ".artifacts")
@@ -245,7 +262,7 @@ def main():
         report = campaign(args)
     except OSError as error:
         parser.error(str(error))
-    print(json.dumps({key: report[key] for key in ("result", "seconds", "error") if key in report}))
+    print(json.dumps(public_summary(report)))
     if report["result"] != "passed":
         raise SystemExit(1)
 

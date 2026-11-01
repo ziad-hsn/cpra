@@ -121,10 +121,20 @@ func testConfig(t testing.TB) Config {
 		t.Fatal(err)
 	}
 	key := filepath.Join(keyDir, "wrapping.key")
-	if err := os.WriteFile(key, bytes.Repeat([]byte{7}, 32), 0600); err != nil {
+	writePrivateTestFile(t, key, bytes.Repeat([]byte{7}, 32))
+	return Config{Client: newFake(), Registry: NewRegistry(), WorkerID: "worker-1", WorkerUID: "worker-uid-1", ServerID: "server-epoch-1", StateDir: filepath.Join(dir, "state"), WrappingKeyPath: key, RetryInterval: time.Millisecond, HeartbeatInterval: time.Hour, DrainTimeout: time.Second}
+}
+
+func writePrivateTestFile(t testing.TB, path string, data []byte) {
+	t.Helper()
+	file, err := createPrivateFile(path)
+	if err != nil {
 		t.Fatal(err)
 	}
-	return Config{Client: newFake(), Registry: NewRegistry(), WorkerID: "worker-1", WorkerUID: "worker-uid-1", ServerID: "server-epoch-1", StateDir: filepath.Join(dir, "state"), WrappingKeyPath: key, RetryInterval: time.Millisecond, HeartbeatInterval: time.Hour, DrainTimeout: time.Second}
+	_, err = file.Write(data)
+	if err = errors.Join(err, file.Close()); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func assignment(id, kind string) api.Assignment {

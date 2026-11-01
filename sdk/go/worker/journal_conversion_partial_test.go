@@ -29,9 +29,7 @@ func TestJournalConversionPartialRefusesAdditionalCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 	truncated := []byte("encrypted-partial-fixture")
-	if err = os.WriteFile(partial, truncated, 0600); err != nil {
-		t.Fatal(err)
-	}
+	writePrivateTestFile(t, partial, truncated)
 	for range 3 {
 		if _, err = ConvertJournal(t.Context(), c); !errors.Is(err, ErrConversionIncomplete) {
 			t.Fatal("partial was ignored", err)

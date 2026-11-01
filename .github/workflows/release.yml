@@ -850,7 +850,7 @@ jobs:
         run: npm install --global pnpm@11.22.0
       - name: Install pinned vulnerability scanner with the release compiler
         if: matrix.compiler == 'go1.27.3'
-        run: GOBIN="$RUNNER_TEMP/cpra-security-tools" GOWORK=off GOENV=off GOFLAGS= GOTOOLCHAIN=local go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+        run: GOBIN="$RUNNER_TEMP/cpra-security-tools" GOWORK=off GOENV=off GOFLAGS='' GOTOOLCHAIN=local go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
       - name: Record complete frozen module, tag and race matrix
         run: |
           python3 -B scripts/release/build_campaign.py --release "$RUNNER_TEMP/source-assets/RELEASE.json" --source-dir "$RUNNER_TEMP/cpra-dependencies/source" --dependencies "$RUNNER_TEMP/cpra-dependencies" --go "$(command -v go)" --security --govulncheck "$RUNNER_TEMP/cpra-security-tools/govulncheck" --a2a-reference-go "$RUNNER_TEMP/cpra-bootstrap-go/bin/go" --out "$RUNNER_TEMP/build-evidence/build-${{ matrix.compiler }}.json"
